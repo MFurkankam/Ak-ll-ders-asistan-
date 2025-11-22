@@ -3,9 +3,8 @@ import tempfile
 from typing import List, Dict, Any, Optional
 import chromadb
 from chromadb.config import Settings
+from chromadb.utils import embedding_functions
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 import PyPDF2
 from docx import Document as DocxDocument
@@ -15,16 +14,12 @@ class RAGProcessor:
     
     def __init__(self, persist_directory: str = "./chroma_db"):
         self.persist_directory = persist_directory
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={'device': 'cpu'}
-        )
+        
+        # ChromaDB varsayılan embedding fonksiyonunu kullan
+        self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
         
         # ChromaDB istemcisini başlat
-        self.chroma_client = chromadb.Client(Settings(
-            persist_directory=persist_directory,
-            anonymized_telemetry=False
-        ))
+        self.chroma_client = chromadb.PersistentClient(path=persist_directory)
         
         # Text splitter oluştur
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -95,35 +90,38 @@ class RAGProcessor:
         self, 
         documents: List[Document], 
         collection_name: str = "ders_notlari"
-    ) -> Chroma:
+    ):
         """Dokümanları vektör veritabanına ekle"""
         try:
             # Mevcut koleksiyonu al veya yeni oluştur
-            vectorstore = Chroma(
-                collection_name=collection_name,
-                embedding_function=self.embeddings,
-                persist_directory=self.persist_directory
+            collection = self.chroma_client.get_or_create_collection(
+                name=collection_name,
+                embedding_function=self.embedding_function
             )
             
             # Dokümanları ekle
-            vectorstore.add_documents(documents)
+            texts = [doc.page_content for doc in documents]
+            metadatas = [doc.metadata for doc in documents]
+            ids = [f"{doc.metadata.get('source', 'unknown')}_{i}" for i, doc in enumerate(documents)]
             
-            # Veritabanını kalıcı hale getir
-            vectorstore.persist()
+            collection.add(
+                documents=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
             
-            return vectorstore
+            return collection
         except Exception as e:
             raise Exception(f"Vektör veritabanına ekleme hatası: {str(e)}")
     
-    def get_vectorstore(self, collection_name: str = "ders_notlari") -> Optional[Chroma]:
-        """Mevcut vektör veritabanını al"""
+    def get_collection(self, collection_name: str = "ders_notlari"):
+        """Mevcut koleksiyonu al"""
         try:
-            vectorstore = Chroma(
-                collection_name=collection_name,
-                embedding_function=self.embeddings,
-                persist_directory=self.persist_directory
+            collection = self.chroma_client.get_collection(
+                name=collection_name,
+                embedding_function=self.embedding_function
             )
-            return vectorstore
+            return collection
         except Exception as e:
             return None
     
@@ -134,25 +132,35 @@ class RAGProcessor:
         collection_name: str = "ders_notlari"
     ) -> List[Document]:
         """Sorguya göre en ilgili dokümanları bul"""
-        vectorstore = self.get_vectorstore(collection_name)
-        if vectorstore is None:
+        collection = self.get_collection(collection_name)
+        if collection is None:
             return []
         
         try:
-            docs = vectorstore.similarity_search(query, k=k)
+            results = collection.query(
+                query_texts=[query],
+                n_results=k
+            )
+            
+            # Sonuçları Document nesnelerine dönüştür
+            docs = []
+            if results and 'documents' in results and results['documents']:
+                for i, doc_text in enumerate(results['documents'][0]):
+                    metadata = results['metadatas'][0][i] if results.get('metadatas') else {}
+                    docs.append(Document(page_content=doc_text, metadata=metadata))
+            
             return docs
         except Exception as e:
             return []
     
     def get_all_sources(self, collection_name: str = "ders_notlari") -> List[str]:
         """Veritabanındaki tüm kaynak dosyaları listele"""
-        vectorstore = self.get_vectorstore(collection_name)
-        if vectorstore is None:
+        collection = self.get_collection(collection_name)
+        if collection is None:
             return []
         
         try:
             # Koleksiyondaki tüm metadataları al
-            collection = vectorstore._collection
             all_data = collection.get()
             
             # Benzersiz kaynak dosyaları bul

@@ -233,8 +233,7 @@ else:
                             )
                         else:
                             # Tüm dokümanlardan örnek al
-                            vectorstore = st.session_state.rag_processor.get_vectorstore()
-                            docs = vectorstore.similarity_search("genel bilgi", k=6)
+                            docs = st.session_state.rag_processor.search_documents("genel bilgi", k=6)
                         
                         if docs and len(docs) > 0:
                             # Bağlamı oluştur
@@ -293,8 +292,7 @@ else:
                                 k=6
                             )
                         else:
-                            vectorstore = st.session_state.rag_processor.get_vectorstore()
-                            docs = vectorstore.similarity_search("genel bilgi", k=6)
+                            docs = st.session_state.rag_processor.search_documents("genel bilgi", k=6)
                         
                         if docs and len(docs) > 0:
                             # Bağlamı oluştur
