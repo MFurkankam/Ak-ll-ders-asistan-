@@ -2,9 +2,8 @@ import os
 from typing import List, Dict, Any, Optional
 from groq import Groq
 from langchain_groq import ChatGroq
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain.docstore.document import Document
+from langchain_core.prompts import PromptTemplate
+from langchain_core.documents import Document
 
 class GroqClient:
     """Groq API istemcisi - Cloud LLM entegrasyonu"""
@@ -49,16 +48,12 @@ Ders Notları:
 
 ÖZET:"""
 
-        prompt = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "instruction"]
-        )
-        
-        chain = LLMChain(llm=self.llm, prompt=prompt)
+        prompt = PromptTemplate.from_template(prompt_template)
         
         try:
-            result = chain.run(context=context, instruction=instruction)
-            return result.strip()
+            chain = prompt | self.llm
+            result = chain.invoke({"context": context, "instruction": instruction})
+            return result.content.strip()
         except Exception as e:
             return f"Özet oluşturulurken hata: {str(e)}"
     
@@ -95,16 +90,12 @@ SORU 2:
 ...
 """
 
-        prompt = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "num_questions"]
-        )
-        
-        chain = LLMChain(llm=self.llm, prompt=prompt)
+        prompt = PromptTemplate.from_template(prompt_template)
         
         try:
-            result = chain.run(context=context, num_questions=num_questions)
-            return self._parse_quiz_response(result)
+            chain = prompt | self.llm
+            result = chain.invoke({"context": context, "num_questions": num_questions})
+            return self._parse_quiz_response(result.content)
         except Exception as e:
             return [{"error": f"Quiz oluşturulurken hata: {str(e)}"}]
     
@@ -185,16 +176,12 @@ Soru: {question}
 
 Cevap:"""
 
-        prompt = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "question"]
-        )
-        
-        chain = LLMChain(llm=self.llm, prompt=prompt)
+        prompt = PromptTemplate.from_template(prompt_template)
         
         try:
-            result = chain.run(context=context, question=question)
-            return result.strip()
+            chain = prompt | self.llm
+            result = chain.invoke({"context": context, "question": question})
+            return result.content.strip()
         except Exception as e:
             return f"Cevap oluşturulurken hata: {str(e)}"
     
