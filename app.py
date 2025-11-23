@@ -84,7 +84,7 @@ with st.sidebar:
     
     menu_option = st.radio(
         "Bir işlem seçin:",
-        ["📤 Dosya Yükle", "💬 Soru-Cevap", "📝 Özet Oluştur", "🎯 Quiz Oluştur", "🎴 Flashcard Oluştur", "📊 Yönetim"],
+        ["📤 Dosya Yükle", "💬 Soru-Cevap", "📝 Özet Oluştur", "🎯 Quiz Oluştur", "📊 Yönetim"],
         index=0
     )
     
@@ -384,89 +384,6 @@ else:
                                                     st.info(f"🔑 Anahtar Kelimeler: {', '.join(q['keywords'])}")
                             else:
                                 st.error("Quiz oluşturulamadı.")
-                                
-                        else:
-                            st.error("İlgili içerik bulunamadı.")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Hata: {str(e)}")
-    
-    # Flashcard Oluştur
-    elif menu_option == "🎴 Flashcard Oluştur":
-        st.header("🎴 Flashcard Oluşturma")
-        
-        sources = st.session_state.rag_processor.get_all_sources()
-        if not sources:
-            st.warning("⚠️ Henüz dosya yüklenmedi. Lütfen önce dosya yükleyin.")
-        else:
-            st.write("Ders notlarınızdan çalışma kartları oluşturun.")
-            
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                flashcard_topic = st.text_input(
-                    "Konu (opsiyonel)",
-                    placeholder="Örn: Programlama kavramları"
-                )
-            
-            with col2:
-                num_cards = st.number_input(
-                    "Kart sayısı",
-                    min_value=5,
-                    max_value=20,
-                    value=10
-                )
-            
-            if st.button("🎴 Flashcard Oluştur", type="primary"):
-                with st.spinner("Flashcard'lar oluşturuluyor..."):
-                    try:
-                        # İlgili dokümanları bul
-                        if flashcard_topic:
-                            docs = st.session_state.rag_processor.search_documents(
-                                flashcard_topic,
-                                k=8
-                            )
-                        else:
-                            docs = st.session_state.rag_processor.search_documents("genel bilgi", k=8)
-                        
-                        if docs and len(docs) > 0:
-                            # Bağlamı oluştur
-                            context = "\n\n".join([doc.page_content for doc in docs])
-                            
-                            # Flashcard oluştur
-                            flashcards = st.session_state.groq_client.generate_flashcards(
-                                context,
-                                num_cards
-                            )
-                            
-                            if flashcards and 'error' not in flashcards[0]:
-                                st.success(f"✅ {len(flashcards)} flashcard başarıyla oluşturuldu!")
-                                st.markdown("---")
-                                
-                                # Flashcard'ları göster
-                                for i, card in enumerate(flashcards, 1):
-                                    with st.container():
-                                        col_left, col_right = st.columns(2)
-                                        
-                                        with col_left:
-                                            st.markdown(f"### 🎴 Kart {i} - Ön Yüz")
-                                            st.info(card.get('front', 'Soru bulunamadı'))
-                                        
-                                        with col_right:
-                                            st.markdown(f"### 🎴 Kart {i} - Arka Yüz")
-                                            # Buton ile arka yüzü göster/gizle
-                                            if f'show_back_{i}' not in st.session_state:
-                                                st.session_state[f'show_back_{i}'] = False
-                                            
-                                            if st.button(f"Cevabı Göster/Gizle", key=f"flip_{i}"):
-                                                st.session_state[f'show_back_{i}'] = not st.session_state[f'show_back_{i}']
-                                            
-                                            if st.session_state[f'show_back_{i}']:
-                                                st.success(card.get('back', 'Cevap bulunamadı'))
-                                        
-                                        st.divider()
-                            else:
-                                st.error("Flashcard oluşturulamadı.")
                                 
                         else:
                             st.error("İlgili içerik bulunamadı.")

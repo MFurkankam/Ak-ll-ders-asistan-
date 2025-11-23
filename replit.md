@@ -43,14 +43,7 @@ Türkçe dil desteği ile RAG (Retrieval-Augmented Generation) tabanlı akıllı
 - Doğru cevap ve açıklama içerir
 - Konu bazlı quiz oluşturma
 
-### 5. Flashcard Oluşturma
-- Otomatik çalışma kartı üretimi
-- Ön yüz (soru/kavram) ve arka yüz (cevap/açıklama)
-- Özelleştirilebilir kart sayısı (5-20)
-- Konu bazlı flashcard oluşturma
-- İnteraktif göster/gizle özelliği
-
-### 6. Sistem Yönetimi
+### 5. Sistem Yönetimi
 - Yüklenmiş dosyaları görüntüleme
 - Veritabanı istatistikleri
 - Veritabanı temizleme
