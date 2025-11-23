@@ -84,7 +84,7 @@ with st.sidebar:
     
     menu_option = st.radio(
         "Bir işlem seçin:",
-        ["📤 Dosya Yükle", "💬 Soru-Cevap", "📝 Özet Oluştur", "🎯 Quiz Oluştur", "📊 Yönetim"],
+        ["📤 Dosya Yükle", "💬 Soru-Cevap", "📝 Özet Oluştur", "🎯 Quiz Oluştur", "🎴 Flashcard Oluştur", "📊 Yönetim"],
         index=0
     )
     
@@ -266,7 +266,7 @@ else:
         else:
             st.write("Ders notlarınızdan otomatik quiz soruları oluşturun.")
             
-            col1, col2 = st.columns([2, 1])
+            col1, col2 = st.columns([3, 1])
             
             with col1:
                 quiz_topic = st.text_input(
@@ -280,6 +280,22 @@ else:
                     min_value=1,
                     max_value=10,
                     value=5
+                )
+            
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                quiz_type = st.selectbox(
+                    "Quiz Türü",
+                    ["Çoktan Seçmeli", "Doğru/Yanlış", "Boşluk Doldurma", "Kısa Cevap"],
+                    index=0
+                )
+            
+            with col4:
+                difficulty = st.selectbox(
+                    "Zorluk Seviyesi",
+                    ["Kolay", "Orta", "Zor"],
+                    index=1
                 )
             
             if st.button("🎲 Quiz Oluştur", type="primary"):
@@ -298,10 +314,26 @@ else:
                             # Bağlamı oluştur
                             context = "\n\n".join([doc.page_content for doc in docs])
                             
+                            # Quiz türünü ve zorluk seviyesini belirle
+                            quiz_type_map = {
+                                "Çoktan Seçmeli": "multiple_choice",
+                                "Doğru/Yanlış": "true_false",
+                                "Boşluk Doldurma": "fill_blank",
+                                "Kısa Cevap": "short_answer"
+                            }
+                            
+                            difficulty_map = {
+                                "Kolay": "kolay",
+                                "Orta": "orta",
+                                "Zor": "zor"
+                            }
+                            
                             # Quiz oluştur
                             questions = st.session_state.groq_client.generate_quiz(
                                 context,
-                                num_questions
+                                num_questions,
+                                quiz_type_map[quiz_type],
+                                difficulty_map[difficulty]
                             )
                             
                             if questions and 'error' not in questions[0]:
@@ -310,19 +342,131 @@ else:
                                 
                                 # Soruları göster
                                 for i, q in enumerate(questions, 1):
-                                    with st.expander(f"📝 Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
-                                        st.write(f"**A)** {q.get('A', '')}")
-                                        st.write(f"**B)** {q.get('B', '')}")
-                                        st.write(f"**C)** {q.get('C', '')}")
-                                        st.write(f"**D)** {q.get('D', '')}")
-                                        
-                                        # Cevabı göster butonu
-                                        if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
-                                            st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'A')}**")
-                                            if 'explanation' in q:
-                                                st.info(f"💡 {q['explanation']}")
+                                    q_type = q.get('type', 'multiple_choice')
+                                    
+                                    if q_type == 'multiple_choice' or 'question' in q and 'A' in q:
+                                        # Çoktan seçmeli
+                                        with st.expander(f"📝 Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
+                                            st.write(f"**A)** {q.get('A', '')}")
+                                            st.write(f"**B)** {q.get('B', '')}")
+                                            st.write(f"**C)** {q.get('C', '')}")
+                                            st.write(f"**D)** {q.get('D', '')}")
+                                            
+                                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
+                                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'A')}**")
+                                                if 'explanation' in q:
+                                                    st.info(f"💡 {q['explanation']}")
+                                    
+                                    elif q_type == 'true_false':
+                                        # Doğru/Yanlış
+                                        with st.expander(f"✓/✗ Soru {i}: {q.get('statement', 'İfade bulunamadı')}", expanded=True):
+                                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
+                                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'Doğru')}**")
+                                                if 'explanation' in q:
+                                                    st.info(f"💡 {q['explanation']}")
+                                    
+                                    elif q_type == 'fill_blank':
+                                        # Boşluk doldurma
+                                        with st.expander(f"__ Soru {i}: Boşluğu doldurun", expanded=True):
+                                            st.write(q.get('sentence', 'Cümle bulunamadı'))
+                                            
+                                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
+                                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', '')}**")
+                                                if 'explanation' in q:
+                                                    st.info(f"💡 {q['explanation']}")
+                                    
+                                    elif q_type == 'short_answer':
+                                        # Kısa cevap
+                                        with st.expander(f"✍️ Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
+                                            if st.button(f"Örnek Cevabı Göster", key=f"answer_{i}"):
+                                                st.success(f"✅ Örnek Cevap: **{q.get('sample_answer', '')}**")
+                                                if 'keywords' in q and q['keywords']:
+                                                    st.info(f"🔑 Anahtar Kelimeler: {', '.join(q['keywords'])}")
                             else:
                                 st.error("Quiz oluşturulamadı.")
+                                
+                        else:
+                            st.error("İlgili içerik bulunamadı.")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Hata: {str(e)}")
+    
+    # Flashcard Oluştur
+    elif menu_option == "🎴 Flashcard Oluştur":
+        st.header("🎴 Flashcard Oluşturma")
+        
+        sources = st.session_state.rag_processor.get_all_sources()
+        if not sources:
+            st.warning("⚠️ Henüz dosya yüklenmedi. Lütfen önce dosya yükleyin.")
+        else:
+            st.write("Ders notlarınızdan çalışma kartları oluşturun.")
+            
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                flashcard_topic = st.text_input(
+                    "Konu (opsiyonel)",
+                    placeholder="Örn: Programlama kavramları"
+                )
+            
+            with col2:
+                num_cards = st.number_input(
+                    "Kart sayısı",
+                    min_value=5,
+                    max_value=20,
+                    value=10
+                )
+            
+            if st.button("🎴 Flashcard Oluştur", type="primary"):
+                with st.spinner("Flashcard'lar oluşturuluyor..."):
+                    try:
+                        # İlgili dokümanları bul
+                        if flashcard_topic:
+                            docs = st.session_state.rag_processor.search_documents(
+                                flashcard_topic,
+                                k=8
+                            )
+                        else:
+                            docs = st.session_state.rag_processor.search_documents("genel bilgi", k=8)
+                        
+                        if docs and len(docs) > 0:
+                            # Bağlamı oluştur
+                            context = "\n\n".join([doc.page_content for doc in docs])
+                            
+                            # Flashcard oluştur
+                            flashcards = st.session_state.groq_client.generate_flashcards(
+                                context,
+                                num_cards
+                            )
+                            
+                            if flashcards and 'error' not in flashcards[0]:
+                                st.success(f"✅ {len(flashcards)} flashcard başarıyla oluşturuldu!")
+                                st.markdown("---")
+                                
+                                # Flashcard'ları göster
+                                for i, card in enumerate(flashcards, 1):
+                                    with st.container():
+                                        col_left, col_right = st.columns(2)
+                                        
+                                        with col_left:
+                                            st.markdown(f"### 🎴 Kart {i} - Ön Yüz")
+                                            st.info(card.get('front', 'Soru bulunamadı'))
+                                        
+                                        with col_right:
+                                            st.markdown(f"### 🎴 Kart {i} - Arka Yüz")
+                                            # Buton ile arka yüzü göster/gizle
+                                            if f'show_back_{i}' not in st.session_state:
+                                                st.session_state[f'show_back_{i}'] = False
+                                            
+                                            if st.button(f"Cevabı Göster/Gizle", key=f"flip_{i}"):
+                                                st.session_state[f'show_back_{i}'] = not st.session_state[f'show_back_{i}']
+                                            
+                                            if st.session_state[f'show_back_{i}']:
+                                                st.success(card.get('back', 'Cevap bulunamadı'))
+                                        
+                                        st.divider()
+                            else:
+                                st.error("Flashcard oluşturulamadı.")
                                 
                         else:
                             st.error("İlgili içerik bulunamadı.")

@@ -30,12 +30,27 @@ Türkçe dil desteği ile RAG (Retrieval-Augmented Generation) tabanlı akıllı
 - LLM destekli akıllı özetleme
 
 ### 4. Quiz Oluşturma
-- Otomatik çoktan seçmeli soru üretimi
+- **Çoklu Format Desteği:**
+  - Çoktan seçmeli (4 seçenek)
+  - Doğru/Yanlış
+  - Boşluk doldurma
+  - Kısa cevaplı sorular
+- **Zorluk Seviyeleri:**
+  - Kolay (temel kavramlar)
+  - Orta (uygulama gerektiren)
+  - Zor (analiz ve sentez)
 - Özelleştirilebilir soru sayısı (1-10)
 - Doğru cevap ve açıklama içerir
 - Konu bazlı quiz oluşturma
 
-### 5. Sistem Yönetimi
+### 5. Flashcard Oluşturma
+- Otomatik çalışma kartı üretimi
+- Ön yüz (soru/kavram) ve arka yüz (cevap/açıklama)
+- Özelleştirilebilir kart sayısı (5-20)
+- Konu bazlı flashcard oluşturma
+- İnteraktif göster/gizle özelliği
+
+### 6. Sistem Yönetimi
 - Yüklenmiş dosyaları görüntüleme
 - Veritabanı istatistikleri
 - Veritabanı temizleme
