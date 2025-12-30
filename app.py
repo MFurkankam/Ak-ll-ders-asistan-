@@ -54,6 +54,9 @@ if 'groq_client' not in st.session_state:
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
+if 'quiz_questions' not in st.session_state:
+    st.session_state.quiz_questions = []
+
 if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = []
 
@@ -329,59 +332,16 @@ else:
                             }
                             
                             # Quiz oluştur
-                            questions = st.session_state.groq_client.generate_quiz(
+                            st.session_state.quiz_questions = st.session_state.groq_client.generate_quiz(
                                 context,
                                 num_questions,
                                 quiz_type_map[quiz_type],
                                 difficulty_map[difficulty]
                             )
                             
-                            if questions and 'error' not in questions[0]:
-                                st.success(f"✅ {len(questions)} soru başarıyla oluşturuldu!")
-                                st.markdown("---")
-                                
-                                # Soruları göster
-                                for i, q in enumerate(questions, 1):
-                                    q_type = q.get('type', 'multiple_choice')
-                                    
-                                    if q_type == 'multiple_choice' or 'question' in q and 'A' in q:
-                                        # Çoktan seçmeli
-                                        with st.expander(f"📝 Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
-                                            st.write(f"**A)** {q.get('A', '')}")
-                                            st.write(f"**B)** {q.get('B', '')}")
-                                            st.write(f"**C)** {q.get('C', '')}")
-                                            st.write(f"**D)** {q.get('D', '')}")
-                                            
-                                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
-                                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'A')}**")
-                                                if 'explanation' in q:
-                                                    st.info(f"💡 {q['explanation']}")
-                                    
-                                    elif q_type == 'true_false':
-                                        # Doğru/Yanlış
-                                        with st.expander(f"✓/✗ Soru {i}: {q.get('statement', 'İfade bulunamadı')}", expanded=True):
-                                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
-                                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'Doğru')}**")
-                                                if 'explanation' in q:
-                                                    st.info(f"💡 {q['explanation']}")
-                                    
-                                    elif q_type == 'fill_blank':
-                                        # Boşluk doldurma
-                                        with st.expander(f"__ Soru {i}: Boşluğu doldurun", expanded=True):
-                                            st.write(q.get('sentence', 'Cümle bulunamadı'))
-                                            
-                                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
-                                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', '')}**")
-                                                if 'explanation' in q:
-                                                    st.info(f"💡 {q['explanation']}")
-                                    
-                                    elif q_type == 'short_answer':
-                                        # Kısa cevap
-                                        with st.expander(f"✍️ Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
-                                            if st.button(f"Örnek Cevabı Göster", key=f"answer_{i}"):
-                                                st.success(f"✅ Örnek Cevap: **{q.get('sample_answer', '')}**")
-                                                if 'keywords' in q and q['keywords']:
-                                                    st.info(f"🔑 Anahtar Kelimeler: {', '.join(q['keywords'])}")
+                            if st.session_state.quiz_questions and 'error' not in st.session_state.quiz_questions[0]:
+                                st.success(f"✅ {len(st.session_state.quiz_questions)} soru başarıyla oluşturuldu!")
+                                st.rerun()
                             else:
                                 st.error("Quiz oluşturulamadı.")
                                 
@@ -390,6 +350,55 @@ else:
                             
                     except Exception as e:
                         st.error(f"❌ Hata: {str(e)}")
+            
+            # Soruları göster
+            if st.session_state.quiz_questions:
+                st.markdown("---")
+                for i, q in enumerate(st.session_state.quiz_questions, 1):
+                    q_type = q.get('type', 'multiple_choice')
+                    
+                    if q_type == 'multiple_choice' or ('question' in q and 'A' in q):
+                        # Çoktan seçmeli
+                        with st.expander(f"📝 Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
+                            st.write(f"**A)** {q.get('A', '')}")
+                            st.write(f"**B)** {q.get('B', '')}")
+                            st.write(f"**C)** {q.get('C', '')}")
+                            st.write(f"**D)** {q.get('D', '')}")
+                            
+                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
+                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'A')}**")
+                                if 'explanation' in q:
+                                    st.info(f"💡 {q['explanation']}")
+                    
+                    elif q_type == 'true_false':
+                        # Doğru/Yanlış
+                        with st.expander(f"✓/✗ Soru {i}: {q.get('statement', 'İfade bulunamadı')}", expanded=True):
+                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
+                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', 'Doğru')}**")
+                                if 'explanation' in q:
+                                    st.info(f"💡 {q['explanation']}")
+                    
+                    elif q_type == 'fill_blank':
+                        # Boşluk doldurma
+                        with st.expander(f"__ Soru {i}: Boşluğu doldurun", expanded=True):
+                            st.write(q.get('sentence', 'Cümle bulunamadı'))
+                            
+                            if st.button(f"Doğru Cevabı Göster", key=f"answer_{i}"):
+                                st.success(f"✅ Doğru Cevap: **{q.get('correct_answer', '')}**")
+                                if 'explanation' in q:
+                                    st.info(f"💡 {q['explanation']}")
+                    
+                    elif q_type == 'short_answer':
+                        # Kısa cevap
+                        with st.expander(f"✍️ Soru {i}: {q.get('question', 'Soru bulunamadı')}", expanded=True):
+                            if st.button(f"Örnek Cevabı Göster", key=f"answer_{i}"):
+                                st.success(f"✅ Örnek Cevap: **{q.get('sample_answer', '')}**")
+                                if 'keywords' in q and q['keywords']:
+                                    st.info(f"🔑 Anahtar Kelimeler: {', '.join(q['keywords'])}")
+                
+                if st.button("🗑️ Quizi Temizle"):
+                    st.session_state.quiz_questions = []
+                    st.rerun()
     
     # Yönetim
     elif menu_option == "📊 Yönetim":
