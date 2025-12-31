@@ -1136,3 +1136,11 @@ yta-general-utils = [{ index = "pytorch-cpu", marker = "platform_system == 'Linu
 zensvi = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 zetascale = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 zuko = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+
+[project.optional-dependencies]
+# Development / test dependencies. Install with: pip install .[dev]
+dev = [
+    "pytest>=7.0",
+    "sqlmodel>=0.0.31",
+    "alembic>=1.17.2",
+]
