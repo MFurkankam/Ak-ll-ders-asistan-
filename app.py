@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from utils.rag_processor import RAGProcessor
 from utils.groq_client import GroqClient
+import json, io, csv
 
 # Sayfa yapılandırması
 st.set_page_config(
@@ -40,9 +41,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Session state başlatma
+# Database init and Session state başlatma
+from utils.db import init_db, get_session
+from utils.auth import create_user, authenticate_user, get_user_by_id
+
+# Initialize DB
+init_db()
+
 if 'rag_processor' not in st.session_state:
     st.session_state.rag_processor = RAGProcessor()
+
+# Auth session
+if 'user' not in st.session_state:
+    st.session_state.user = None
 
 if 'groq_client' not in st.session_state:
     groq_api_key = os.getenv("GROQ_API_KEY")
@@ -59,6 +70,42 @@ if 'quiz_questions' not in st.session_state:
 
 if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = []
+
+# Sidebar auth UI
+with st.sidebar:
+    if st.session_state.user is None:
+        auth_tab = st.selectbox("Hesap", ["Giriş Yap","Kayıt Ol"], key="auth_tab")
+        if auth_tab == "Giriş Yap":
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Parola", type="password", key="login_password")
+            if st.button("Giriş Yap", key="login_btn"):
+                try:
+                    user = authenticate_user(email, password)
+                    if user:
+                        st.session_state.user = {"id": user.id, "email": user.email, "role": user.role, "full_name": user.full_name}
+                        st.success("Giriş başarılı")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Email veya parola yanlış")
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+        else:
+            reg_email = st.text_input("Email", key="reg_email")
+            reg_name = st.text_input("Ad Soyad", key="reg_name")
+            reg_password = st.text_input("Parola", type="password", key="reg_password")
+            role_choice = st.selectbox("Rol", ["student","teacher"], key="reg_role")
+            if st.button("Kayıt Ol", key="reg_btn"):
+                try:
+                    user = create_user(reg_email, reg_password, full_name=reg_name, role=role_choice)
+                    st.success("Kayıt başarılı. Giriş yapabilirsiniz.")
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+    else:
+        st.markdown(f"**Giriş yapan:** {st.session_state.user.get('full_name') or st.session_state.user.get('email')}")
+        if st.button("Çıkış Yap", key="logout_btn"):
+            st.session_state.user = None
+            st.experimental_rerun()
 
 # Başlık
 st.markdown('<h1 class="main-header">📚 Akıllı Ders Asistanı</h1>', unsafe_allow_html=True)
@@ -87,7 +134,7 @@ with st.sidebar:
     
     menu_option = st.radio(
         "Bir işlem seçin:",
-        ["📤 Dosya Yükle", "💬 Soru-Cevap", "📝 Özet Oluştur", "🎯 Quiz Oluştur", "📊 Yönetim"],
+        ["📤 Dosya Yükle", "🏫 Sınıflar", "💬 Soru-Cevap", "📝 Özet Oluştur", "🎯 Quiz Oluştur", "📊 Yönetim"],
         index=0
     )
     
@@ -106,6 +153,241 @@ with st.sidebar:
 if st.session_state.groq_client is None and menu_option != "📤 Dosya Yükle":
     st.error("🔑 Lütfen önce Groq API Key'inizi girin!")
 else:
+    # Sınıflar
+    if menu_option == "🏫 Sınıflar":
+        st.header("🏫 Sınıf Yönetimi")
+        if st.session_state.user is None:
+            st.info("Lütfen önce giriş yapın.")
+        else:
+            from utils.classes import create_class, join_class_by_code, get_user_classes
+            from utils.quiz import get_quizzes_for_class, create_quiz, publish_quiz, get_questions_for_quiz, grade_attempt
+
+            st.subheader("Sınıf Oluştur")
+            col1, col2 = st.columns([3,1])
+            with col1:
+                class_title = st.text_input("Sınıf başlığı")
+                class_desc = st.text_area("Açıklama")
+            with col2:
+                if st.button("Oluştur"):
+                    try:
+                        cls = create_class(class_title, class_desc, st.session_state.user['id'])
+                        st.success(f"Sınıf oluşturuldu! Davet kodu: {cls.code}")
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Hata: {e}")
+
+            st.subheader("Sınıfa Katıl")
+            join_code = st.text_input("Davet kodu ile katıl")
+            if st.button("Katıl"):
+                try:
+                    enroll = join_class_by_code(join_code, st.session_state.user['id'])
+                    st.success("Sınıfa başarıyla katıldınız!")
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+
+            st.subheader("Üyeliğim Olan Sınıflar")
+            classes = get_user_classes(st.session_state.user['id'])
+            if classes:
+                # select class to manage
+                class_map = {f"{c.title} ({c.code})": c for c in classes}
+                sel = st.selectbox("Bir sınıf seçin", list(class_map.keys()))
+                active_class = class_map.get(sel)
+
+                st.write(f"**{active_class.title}** — Kod: `{active_class.code}`")
+                st.write(active_class.description or "")
+
+                # If user is owner or a teacher, show management tools
+                can_manage = (st.session_state.user.get('role') == 'teacher') or (active_class.owner_id == st.session_state.user.get('id'))
+
+                if can_manage:
+                    st.markdown("---")
+                    st.subheader("Sınıf İçin Quiz Yönetimi")
+
+                    # Show existing quizzes
+                    quizzes = get_quizzes_for_class(active_class.id)
+                    if quizzes:
+                        for q in quizzes:
+                            with st.expander(f"{q.title} — {'Yayınlandı' if q.published else 'Taslak'}"):
+                                st.write(f"Oluşturan: {q.author_id} — Oluşturuldu: {q.created_at}")
+                                col_a, col_b = st.columns([1,1])
+                                with col_a:
+                                    if st.button("Yayınla" if not q.published else "Yayını Kapat", key=f"pub_{q.id}"):
+                                        try:
+                                            publish_quiz(q.id, publish=not q.published)
+                                            st.success("Durum güncellendi")
+                                            st.experimental_rerun()
+                                        except Exception as e:
+                                            st.error(f"Hata: {e}")
+                                with col_b:
+                                    if st.button("Soruları Görüntüle", key=f"view_{q.id}"):
+                                        questions = get_questions_for_quiz(q.id)
+                                        for qq in questions:
+                                            st.write(f"- ({qq.type}) {qq.text} [{qq.points} puan]")
+                    else:
+                        st.info("Henüz bu sınıfa ait quiz yok.")
+
+                    st.markdown("---")
+                    st.subheader("Otomatik Oluşturulan Quiz'i Kaydet")
+                    if st.session_state.quiz_questions:
+                        save_title = st.text_input("Quiz Başlığı (Kaydetmek için) ")
+                        if st.button("Quizi Kaydet"):
+                            try:
+                                # transform generated questions into DB format
+                                qlist = []
+                                for gq in st.session_state.quiz_questions:
+                                    qtype = gq.get('type') or gq.get('question_type') or 'mcq'
+                                    if qtype in ('multiple_choice','mcq'):
+                                        choices = {k:v for k,v in gq.items() if k in ('A','B','C','D')}
+                                        correct = gq.get('correct_answer') or gq.get('correct')
+                                        qlist.append({'type':'mcq','text': gq.get('question') or gq.get('question_text'),'choices':choices,'correct_answer':correct,'topics': gq.get('topics',[]),'points':1.0})
+                                    elif qtype == 'true_false':
+                                        qlist.append({'type':'true_false','text': gq.get('statement') or gq.get('question'),'correct_answer': gq.get('correct_answer'),'points':1.0})
+                                    elif qtype == 'fill_blank':
+                                        qlist.append({'type':'fill_blank','text': gq.get('sentence'),'correct_answer': gq.get('correct_answer'),'points':1.0})
+                                    else:
+                                        qlist.append({'type':'short_answer','text': gq.get('question'),'correct_answer': gq.get('sample_answer') or gq.get('correct_answer'),'topics': gq.get('keywords',[]),'points':1.0})
+
+                                created = create_quiz(active_class.id, save_title or 'Yeni Quiz', st.session_state.user['id'], qlist)
+                                st.success(f"Quiz kaydedildi: {created.title}")
+                                st.session_state.quiz_questions = []
+                                st.experimental_rerun()
+                            except Exception as e:
+                                st.error(f"Hata: {e}")
+                    else:
+                        st.info("Kaydetmek için otomatik oluşturulmuş bir quiz yok. Quiz Oluştur menüsünden önce otomatik quiz oluşturun.")
+
+                    st.markdown("---")
+                    st.subheader("Konu Başarı Durumu")
+                    from utils.quiz import compute_topic_mastery, get_attempts_for_class
+                    topic_stats = compute_topic_mastery(active_class.id)
+                    if topic_stats:
+                        for topic, data in topic_stats.items():
+                            st.write(f"- **{topic}**: %{data['mastery']*100:.1f} ({data['correct']}/{data['attempts']})")
+                        weak = [t for t,d in topic_stats.items() if d['attempts']>=3 and d['mastery'] < 0.6]
+                        if weak:
+                            st.warning("🔻 Zayıf konular: " + ", ".join(weak))
+                    else:
+                        st.info("Henüz deneme verisi yok.")
+
+                    st.subheader("Denemeler")
+                    # Filters
+                    quiz_opts = ['Tüm quizler'] + [q.title for q in quizzes]
+                    sel_quiz_title = st.selectbox("Quiz", quiz_opts, index=0, key=f"quiz_filter_{active_class.id}")
+                    sel_quiz_id = None
+                    if sel_quiz_title != 'Tüm quizler':
+                        sel_quiz_id = [q for q in quizzes if q.title == sel_quiz_title][0].id
+
+                    # gather current attempts for student list
+                    all_attempts = get_attempts_for_class(active_class.id)
+                    student_opts = ['Tümü'] + sorted({a['user_email'] for a in all_attempts})
+                    sel_student = st.selectbox("Öğrenci", student_opts, index=0, key=f"student_filter_{active_class.id}")
+                    sel_student_email = None if sel_student == 'Tümü' else sel_student
+
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        date_range = st.date_input("Tarih aralığı", key=f"date_filter_{active_class.id}")
+                    with col_b:
+                        if st.button("Filtrele"):
+                            st.experimental_rerun()
+
+                    since = None
+                    until = None
+                    if isinstance(date_range, list) and len(date_range) == 2:
+                        since = date_range[0].isoformat()
+                        until = date_range[1].isoformat()
+
+                    attempts = get_attempts_for_class(active_class.id, quiz_id=sel_quiz_id, user_email=sel_student_email, since=since, until=until)
+
+                    if attempts:
+                        # Topic mastery for filtered attempts
+                        topic_stats_filtered = compute_topic_mastery(active_class.id, attempts=attempts)
+                        if topic_stats_filtered:
+                            st.markdown('---')
+                            st.subheader('Konu Başarı Grafiği')
+                            chart_data = {k: v['mastery']*100 for k,v in topic_stats_filtered.items()}
+                            st.bar_chart(list(chart_data.values()), use_container_width=True)
+                            cols = list(chart_data.keys())
+                            if cols:
+                                st.write(', '.join([f"{k}: %{v:.1f}" for k,v in chart_data.items()]))
+
+                        # CSV export (filtered)
+                        if st.button("CSV Olarak İndir (Filtreli)"):
+                            output = io.StringIO()
+                            writer = csv.writer(output)
+                            writer.writerow(['attempt_id','quiz_title','user_email','score','max_score','finished_at'])
+                            for a in attempts:
+                                writer.writerow([a['attempt_id'], a['quiz_title'], a['user_email'], a['score'], a['max_score'], a['finished_at']])
+                            st.download_button("CSV İndir (Filtreli)", data=output.getvalue(), file_name=f"attempts_class_{active_class.code}_filtered.csv", mime="text/csv")
+
+                        for a in attempts:
+                            with st.expander(f"{a['finished_at'] or ''} | {a['user_email']} | {a['quiz_title']} | {a['score']}/{a['max_score']}"):
+                                st.write(f"Attempt ID: {a['attempt_id']}")
+                                det = get_attempt_detail(a['attempt_id'])
+                                if det:
+                                    for pq in det['per_question']:
+                                        st.write(f"- ({'Doğru' if pq['correct'] else 'Yanlış'}) {pq['question_text']} [{pq['points']}]")
+                    else:
+                        st.info("Henüz deneme yok.")
+
+                # For students: list published quizzes and allow attempt
+                st.markdown("---")
+                st.subheader("Sınıftaki Yayınlanmış Quizler")
+                quizzes = get_quizzes_for_class(active_class.id)
+                pub_quizzes = [q for q in quizzes if q.published]
+                if pub_quizzes:
+                    for pq in pub_quizzes:
+                        with st.expander(f"{pq.title} — Yayınlandı"):
+                            st.write(f"Oluşturan: {pq.author_id} — Oluşturuldu: {pq.created_at}")
+                            if st.session_state.user.get('role') == 'student':
+                                if st.button("Quiz'e Katıl", key=f"att_{pq.id}"):
+                                    # load questions into session
+                                    qs = get_questions_for_quiz(pq.id)
+                                    st.session_state.current_attempt = {'quiz_id': pq.id, 'questions': [{ 'id': q.id, 'type': q.type, 'text': q.text, 'choices': json.loads(q.choices) if q.choices else None } for q in qs]}
+                                    st.experimental_rerun()
+                else:
+                    st.info("Henüz yayınlanmış bir quiz yok.")
+
+                # If there is a current attempt in session, show attempt UI
+                if st.session_state.get('current_attempt'):
+                    attempt = st.session_state.current_attempt
+                    st.markdown('---')
+                    st.subheader('Quiz Denemesi')
+                    answers = []
+                    for q in attempt['questions']:
+                        st.write(f"**{q['text']}**")
+                        if q['type'] == 'mcq':
+                            opt = st.radio(f"Secim {q['id']}", options=list(q['choices'].keys()), key=f"ans_{q['id']}")
+                            answers.append({'question_id': q['id'], 'answer': opt})
+                        elif q['type'] == 'true_false':
+                            val = st.selectbox(f"Doğru/Yanlış {q['id']}", options=['True','False'], key=f"ans_{q['id']}")
+                            answers.append({'question_id': q['id'], 'answer': val})
+                        elif q['type'] == 'fill_blank':
+                            val = st.text_input(f"Cevap {q['id']}", key=f"ans_{q['id']}")
+                            answers.append({'question_id': q['id'], 'answer': val})
+                        else:
+                            val = st.text_area(f"Cevap {q['id']}", key=f"ans_{q['id']}")
+                            answers.append({'question_id': q['id'], 'answer': val})
+
+                    if st.button('📝 Denemeyi Bitir'):
+                        # gather answers from session state
+                        gathered = []
+                        for q in attempt['questions']:
+                            a = st.session_state.get(f"ans_{q['id']}")
+                            gathered.append({'question_id': q['id'], 'answer': a})
+                        try:
+                            res = grade_attempt(attempt['quiz_id'], st.session_state.user['id'], gathered)
+                            st.success(f"Puan: {res['score']} / {res['max_score']}")
+                            for pqres in res['per_question']:
+                                st.write(f"Soru {pqres['question_id']}: {'Doğru' if pqres['correct'] else 'Yanlış'}")
+                            st.session_state.current_attempt = None
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f"Hata: {e}")
+
+            else:
+                st.info("Henüz hiçbir sınıfa katılmadınız veya oluşturmadınız.")
+
     # Dosya Yükle
     if menu_option == "📤 Dosya Yükle":
         st.header("📤 Ders Notu Yükleme")
