@@ -8,14 +8,27 @@ def test_attempt_filtering():
     # setup
     with get_session() as s:
         t = User(email='tf@example.com', password_hash='x', full_name='T', role='teacher')
-        s.add(t); s.commit(); s.refresh(t)
+        s.add(t)
+        s.commit()
+        s.refresh(t)
         teacher_id = t.id
         cl = Class(title='FilterClass', code='F1', description='x', owner_id=teacher_id)
-        s.add(cl); s.commit(); s.refresh(cl)
+        s.add(cl)
+        s.commit()
+        s.refresh(cl)
         class_id = cl.id
     
-    questions = [{'type':'mcq','text':'Q1','choices':{'A':'1','B':'2'},'correct_answer':'A','topics':['t1'],'points':1}]
-    quiz = create_quiz(class_id, 'Filter Quiz', teacher_id, questions)
+    questions = [
+        {
+            'type': 'mcq',
+            'text': 'Q1',
+            'choices': {'A': '1', 'B': '2'},
+            'correct_answer': 'A',
+            'topics': ['t1'],
+            'points': 1,
+        },
+    ]
+    create_quiz(class_id, 'Filter Quiz', teacher_id, questions)
     quizzes = get_quizzes_for_class(class_id)
     quiz_obj = [q for q in quizzes if q.title == 'Filter Quiz'][0]
 

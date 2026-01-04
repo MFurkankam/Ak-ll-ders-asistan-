@@ -13,22 +13,37 @@ def test_datetime_fields_are_timezone_aware():
         assert teacher.created_at.tzinfo is not None and teacher.created_at.tzinfo == timezone.utc
         s.commit()
 
-        cl = Class(title='TZClass', code='TZ1', description='x', owner_id=teacher.id)
-        s.add(cl); s.flush();
-        assert cl.created_at.tzinfo is not None and cl.created_at.tzinfo == timezone.utc
+        cl = Class(
+            title='TZClass', code='TZ1', description='x', owner_id=teacher.id
+        )
+        s.add(cl)
+        s.flush()
+        assert (
+            cl.created_at.tzinfo is not None and cl.created_at.tzinfo == timezone.utc
+        )
         s.commit()
 
         quiz = Quiz(class_id=cl.id, title='TZ Quiz', author_id=teacher.id)
-        s.add(quiz); s.flush();
-        assert quiz.created_at.tzinfo is not None and quiz.created_at.tzinfo == timezone.utc
+        s.add(quiz)
+        s.flush()
+        assert (
+            quiz.created_at.tzinfo is not None and quiz.created_at.tzinfo == timezone.utc
+        )
         s.commit()
 
         student = User(email='tz_student@example.com', password_hash='x', full_name='S', role='student')
-        s.add(student); s.flush();
-        assert student.created_at.tzinfo is not None and student.created_at.tzinfo == timezone.utc
+        s.add(student)
+        s.flush()
+        assert (
+            student.created_at.tzinfo is not None and student.created_at.tzinfo == timezone.utc
+        )
         s.commit()
 
         attempt = Attempt(quiz_id=quiz.id, user_id=student.id)
-        s.add(attempt); s.flush();
-        assert attempt.started_at is not None and attempt.started_at.tzinfo is not None and attempt.started_at.tzinfo == timezone.utc
+        s.add(attempt)
+        s.flush()
+        assert (
+            attempt.started_at is not None and attempt.started_at.tzinfo is not None
+            and attempt.started_at.tzinfo == timezone.utc
+        )
         s.commit()

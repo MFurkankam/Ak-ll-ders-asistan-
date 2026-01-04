@@ -5,13 +5,14 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
 
+
 class GroqClient:
     """Groq API istemcisi - Cloud LLM entegrasyonu"""
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY bulunamadı! Lütfen API anahtarınızı ayarlayın.")
+            raise ValueError("GROQ_API_KEY eksik")
         
         # Groq client oluştur
         self.client = Groq(api_key=self.api_key)
@@ -34,10 +35,15 @@ class GroqClient:
         detail_instructions = {
             "kısa": "Çok kısa ve öz bir özet yap (3-5 madde)",
             "orta": "Orta uzunlukta, ana noktaları kapsayan bir özet yap",
-            "detaylı": "Detaylı ve kapsamlı bir özet yap, önemli tüm noktaları dahil et"
+            "detaylı": (
+                "Detaylı ve kapsamlı bir özet yap, "
+                "önemli tüm noktaları dahil et"
+            )
         }
         
-        instruction = detail_instructions.get(detail_level, detail_instructions["orta"])
+        instruction = detail_instructions.get(detail_level)
+        if instruction is None:
+            instruction = detail_instructions["orta"]
         
         prompt_template = """Aşağıdaki ders notlarını Türkçe olarak özetle.
 
@@ -126,7 +132,9 @@ KART 2:
             if 'front' in card and 'back' in card:
                 valid_flashcards.append(card)
         
-        return valid_flashcards if valid_flashcards else [{"error": "Flashcard parse edilemedi"}]
+        if valid_flashcards:
+            return valid_flashcards
+        return [{"error": "Flashcard parse edilemedi"}]
     
     def generate_quiz(
         self, 
@@ -147,20 +155,28 @@ KART 2:
             return self._generate_multiple_choice_quiz(context, num_questions, difficulty)
     
     def _generate_multiple_choice_quiz(
-        self, 
-        context: str, 
+        self,
+        context: str,
         num_questions: int = 5,
-        difficulty: str = "orta"
+        difficulty: str = "orta",
     ) -> List[Dict[str, Any]]:
         """Çoktan seçmeli quiz oluştur"""
-        
+
         difficulty_instructions = {
             "kolay": "Temel kavramları test eden basit sorular oluştur.",
-            "orta": "Orta seviye, kavramları anlama ve uygulama gerektiren sorular oluştur.",
-            "zor": "İleri seviye, analiz ve sentez gerektiren zorlayıcı sorular oluştur."
+            "orta": (
+                "Orta seviye, kavramları anlama ve uygulama gerektiren "
+                "sorular oluştur."
+            ),
+            "zor": (
+                "İleri seviye, analiz ve sentez gerektiren "
+                "zorlayıcı sorular oluştur."
+            ),
         }
-        difficulty_instruction = difficulty_instructions.get(difficulty, difficulty_instructions["orta"])
-        
+        difficulty_instruction = (
+            difficulty_instructions.get(difficulty) or difficulty_instructions["orta"]
+        )
+
         prompt_template = """Aşağıdaki ders notlarından {num_questions} adet çoktan seçmeli soru oluştur.
 
 {difficulty_instruction}
@@ -190,14 +206,16 @@ SORU 2:
 """
 
         prompt = PromptTemplate.from_template(prompt_template)
-        
+
         try:
             chain = prompt | self.llm
-            result = chain.invoke({
-                "context": context, 
-                "num_questions": num_questions,
-                "difficulty_instruction": difficulty_instruction
-            })
+            result = chain.invoke(
+                {
+                    "context": context,
+                    "num_questions": num_questions,
+                    "difficulty_instruction": difficulty_instruction,
+                }
+            )
             return self._parse_quiz_response(result.content)
         except Exception as e:
             return [{"error": f"Quiz oluşturulurken hata: {str(e)}"}]

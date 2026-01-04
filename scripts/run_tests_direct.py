@@ -6,9 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from tests.test_mastery import test_compute_topic_mastery
-from tests.test_compute_with_attempts import test_compute_with_filtered_attempts
-from tests.test_filters import test_attempt_filtering
+from tests.test_mastery import test_compute_topic_mastery  # noqa: E402
+from tests.test_compute_with_attempts import test_compute_with_filtered_attempts  # noqa: E402
+from tests.test_filters import test_attempt_filtering  # noqa: E402
 
 
 def run_test(func):

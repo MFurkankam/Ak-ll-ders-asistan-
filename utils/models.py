@@ -39,7 +39,7 @@ class User(SQLModel, table=True):
 class Class(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
-    code: str = Field(index=True)
+    code: str = Field(index=True, unique=True)
     description: Optional[str] = None
     owner_id: int = Field(foreign_key="user.id")
     created_at: datetime = Field(

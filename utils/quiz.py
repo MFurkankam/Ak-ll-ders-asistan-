@@ -4,6 +4,7 @@ from utils.models import Quiz, Question, Attempt
 from sqlmodel import select
 import json
 from datetime import datetime, timezone
+import unicodedata
 
 
 def create_quiz(class_id: int, title: str, author_id: int, questions: List[Dict[str, Any]]):
@@ -61,8 +62,29 @@ def publish_quiz(quiz_id: int, publish: bool = True):
         return quiz
 
 
-def _normalize_text(t: str) -> str:
-    return ''.join(e for e in t.lower().strip() if e.isalnum() or e.isspace())
+def _strip_accents(text: str) -> str:
+    return "".join(
+        ch for ch in unicodedata.normalize("NFKD", text)
+        if not unicodedata.combining(ch)
+    )
+
+
+def _normalize_text(t: str | None) -> str:
+    if t is None:
+        return ""
+    text = _strip_accents(str(t)).lower().strip()
+    return "".join(e for e in text if e.isalnum() or e.isspace())
+
+
+def _normalize_true_false(value) -> str:
+    if value is None:
+        return ""
+    text = _strip_accents(str(value)).strip().lower()
+    if text in ("true", "t", "1", "yes", "y", "dogru"):
+        return "true"
+    if text in ("false", "f", "0", "no", "n", "yanlis"):
+        return "false"
+    return text
 
 
 def grade_attempt(quiz_id: int, user_id: int, answers: List[Dict[str, Any]]):
@@ -89,13 +111,16 @@ def grade_attempt(quiz_id: int, user_id: int, answers: List[Dict[str, Any]]):
             except Exception:
                 correct_val = q.correct_answer
         # MCQ or TF
-        if q.type in ('mcq', 'true_false'):
+        if q.type == 'mcq':
             if isinstance(correct_val, (list, dict)):
                 # if stored as structure
                 correct_choice = correct_val
             else:
                 correct_choice = str(correct_val)
             if str(provided).strip().lower() == str(correct_choice).strip().lower():
+                correct = True
+        elif q.type == 'true_false':
+            if _normalize_true_false(provided) == _normalize_true_false(correct_val):
                 correct = True
         elif q.type == 'fill_blank':
             if isinstance(correct_val, str):
@@ -185,6 +210,7 @@ def get_attempts_for_class(class_id: int, quiz_id: int = None, user_email: str =
                 'quiz_title': quiz_map.get(at.quiz_id).title if quiz_map.get(at.quiz_id) else '',
                 'user_id': at.user_id,
                 'user_email': user.email if user else '',
+                'user_full_name': user.full_name if user else '',
                 'score': at.score,
                 'max_score': at.max_score,
                 'per_question': json.loads(at.per_question) if at.per_question else None,

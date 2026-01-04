@@ -8,17 +8,37 @@ def test_compute_topic_mastery():
     # setup teacher and class
     with get_session() as s:
         teacher = User(email='t_mastery@example.com', password_hash='x', full_name='T', role='teacher')
-        s.add(teacher); s.commit(); s.refresh(teacher)
-        cl = Class(title='MasteryClass', code='M1', description='x', owner_id=teacher.id)
-        s.add(cl); s.commit(); s.refresh(cl)
+        s.add(teacher)
+        s.commit()
+        s.refresh(teacher)
+        cl = Class(
+            title='MasteryClass', code='M1', description='x', owner_id=teacher.id
+        )
+        s.add(cl)
+        s.commit()
+        s.refresh(cl)
         class_id = cl.id
         teacher_id = teacher.id
 
     questions = [
-        {'type':'mcq','text':'Q1','choices':{'A':'1','B':'2','C':'3','D':'4'},'correct_answer':'A','topics':['t1'], 'points':1},
-        {'type':'mcq','text':'Q2','choices':{'A':'x','B':'y','C':'z','D':'w'},'correct_answer':'C','topics':['t1','t2'], 'points':1}
+        {
+            'type': 'mcq',
+            'text': 'Q1',
+            'choices': {'A': '1', 'B': '2', 'C': '3', 'D': '4'},
+            'correct_answer': 'A',
+            'topics': ['t1'],
+            'points': 1,
+        },
+        {
+            'type': 'mcq',
+            'text': 'Q2',
+            'choices': {'A': 'x', 'B': 'y', 'C': 'z', 'D': 'w'},
+            'correct_answer': 'C',
+            'topics': ['t1', 't2'],
+            'points': 1,
+        },
     ]
-    quiz = create_quiz(class_id, 'Mastery Quiz', teacher_id, questions)
+    create_quiz(class_id, 'Mastery Quiz', teacher_id, questions)
 
     # student1: answers both correct
     with get_session() as s:
@@ -30,7 +50,13 @@ def test_compute_topic_mastery():
     quizzes = get_quizzes_for_class(class_id)
     quiz_obj = [x for x in quizzes if x.title == 'Mastery Quiz'][0]
     qs = get_questions_for_quiz(quiz_obj.id)
-    answers1 = [{'question_id': q.id, 'answer': ("A" if q.text=='Q1' else "C")} for q in qs]
+    answers1 = [
+        {
+            'question_id': q.id,
+            'answer': ("A" if q.text == 'Q1' else "C"),
+        }
+        for q in qs
+    ]
     grade_attempt(quiz_obj.id, s1id, answers1)
 
     # student2: answers both incorrect

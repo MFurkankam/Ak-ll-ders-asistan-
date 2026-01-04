@@ -1,8 +1,10 @@
 import random
 import string
 from utils.db import get_session
-from utils.models import Class, Enrollment
+from utils.models import Class, Enrollment, Quiz, Question, Attempt
 from sqlmodel import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete
 
 
 def _generate_code(length: int = 6) -> str:
@@ -10,23 +12,34 @@ def _generate_code(length: int = 6) -> str:
 
 
 def create_class(title: str, description: str, owner_id: int, code: str | None = None) -> Class:
-    if code is None:
-        code = _generate_code()
+    max_attempts = 8
     with get_session() as session:
-        # ensure unique code
-        q = select(Class).where(Class.code == code)
-        existing = session.exec(q).first()
-        if existing:
-            code = _generate_code()
-        cls = Class(title=title, description=description, owner_id=owner_id, code=code)
-        session.add(cls)
-        session.commit()
-        session.refresh(cls)
-        # enroll owner as teacher in class
-        enroll = Enrollment(class_id=cls.id, user_id=owner_id, role_in_class='teacher')
-        session.add(enroll)
-        session.commit()
-        return cls
+        for _ in range(max_attempts):
+            candidate = code or _generate_code()
+            q = select(Class).where(Class.code == candidate)
+            if session.exec(q).first():
+                code = None
+                continue
+            cls = Class(
+                title=title,
+                description=description,
+                owner_id=owner_id,
+                code=candidate,
+            )
+            session.add(cls)
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                code = None
+                continue
+            session.refresh(cls)
+            # enroll owner as teacher in class
+            enroll = Enrollment(class_id=cls.id, user_id=owner_id, role_in_class='teacher')
+            session.add(enroll)
+            session.commit()
+            return cls
+    raise ValueError("Unable to generate unique class code")
 
 
 def join_class_by_code(code: str, user_id: int) -> Enrollment:
@@ -51,3 +64,24 @@ def get_user_classes(user_id: int):
     with get_session() as session:
         q = select(Class).join(Enrollment, Enrollment.class_id == Class.id).where(Enrollment.user_id == user_id)
         return list(session.exec(q))
+
+
+def delete_class(class_id: int, user_id: int):
+    with get_session() as session:
+        cls = session.get(Class, class_id)
+        if not cls:
+            raise ValueError("Class not found")
+        if cls.owner_id != user_id:
+            raise PermissionError("Only class owner can delete the class")
+
+        quizzes = list(session.exec(select(Quiz).where(Quiz.class_id == class_id)))
+        quiz_ids = [q.id for q in quizzes]
+        if quiz_ids:
+            session.exec(delete(Question).where(Question.quiz_id.in_(quiz_ids)))
+            session.exec(delete(Attempt).where(Attempt.quiz_id.in_(quiz_ids)))
+            session.exec(delete(Quiz).where(Quiz.id.in_(quiz_ids)))
+
+        session.exec(delete(Enrollment).where(Enrollment.class_id == class_id))
+        session.exec(delete(Class).where(Class.id == class_id))
+        session.commit()
+        return True

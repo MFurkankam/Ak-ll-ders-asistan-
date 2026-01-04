@@ -15,4 +15,4 @@ def init_db():
 
 
 def get_session():
-    return Session(engine)
+    return Session(engine, expire_on_commit=False)
