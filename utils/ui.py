@@ -100,8 +100,16 @@ def render_sidebar(collection_name, show_sources=True):
 
 def render_auth():
     if st.session_state.user is None:
-        auth_tab = st.selectbox("Hesap", ["Giriş Yap", "Kayıt Ol"], key="auth_tab")
-        if auth_tab == "Giriş Yap":
+        auth_options = ["Giriş Yap", "Kayıt Ol"]
+        if st.session_state.get("pending_auth_tab"):
+            st.session_state["auth_tab"] = auth_options[0]
+            st.session_state.reg_success = True
+            st.session_state.pending_auth_tab = False
+        auth_tab = st.selectbox("Hesap", auth_options, key="auth_tab")
+        if auth_tab == auth_options[0]:
+            if st.session_state.get("reg_success"):
+                st.success("Kayıt başarılı. Giriş yapabilirsiniz.")
+                st.session_state.reg_success = False
             email = st.text_input("Email", key="login_email")
             password = st.text_input("Parola", type="password", key="login_password")
             if st.button("Giriş Yap", key="login_btn"):
@@ -140,7 +148,7 @@ def render_auth():
                         full_name=reg_name,
                         role=role_choice,
                     )
-                    st.success("Kayıt başarılı. Giriş yapabilirsiniz.")
+                    st.session_state.pending_auth_tab = True
                     st.rerun()
                 except Exception as e:
                     st.error(f"Hata: {e}")

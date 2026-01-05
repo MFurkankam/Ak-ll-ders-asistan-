@@ -459,8 +459,6 @@ if show_class_detail and selected_class_id:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Hata: {e}")
-        else:
-            st.info("Kaydetmek için önce quiz oluştur.")
 
         if active_class.owner_id == st.session_state.user.get("id"):
             st.markdown("---")
