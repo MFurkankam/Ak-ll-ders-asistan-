@@ -6,6 +6,8 @@ import json
 from datetime import datetime, timezone
 import unicodedata
 
+MAX_ATTEMPTS_PER_QUIZ = 2
+
 
 def create_quiz(class_id: int, title: str, author_id: int, questions: List[Dict[str, Any]]):
     """questions: list of dicts: {type,text,choices(optional dict), correct_answer, topics(optional list), points}
@@ -62,6 +64,22 @@ def publish_quiz(quiz_id: int, publish: bool = True):
         return quiz
 
 
+def delete_quiz(quiz_id: int, user_id: int) -> bool:
+    from sqlalchemy import delete
+    with get_session() as session:
+        quiz = session.get(Quiz, quiz_id)
+        if not quiz:
+            raise ValueError("Quiz not found")
+        if quiz.author_id != user_id:
+            raise PermissionError("Only quiz owner can delete the quiz")
+
+        session.exec(delete(Question).where(Question.quiz_id == quiz_id))
+        session.exec(delete(Attempt).where(Attempt.quiz_id == quiz_id))
+        session.exec(delete(Quiz).where(Quiz.id == quiz_id))
+        session.commit()
+        return True
+
+
 def _strip_accents(text: str) -> str:
     return "".join(
         ch for ch in unicodedata.normalize("NFKD", text)
@@ -91,6 +109,16 @@ def grade_attempt(quiz_id: int, user_id: int, answers: List[Dict[str, Any]]):
     """answers: list of {question_id, answer}
     Returns dict with score and per_question results
     """
+    with get_session() as session:
+        existing = session.exec(
+            select(Attempt).where(
+                Attempt.quiz_id == quiz_id,
+                Attempt.user_id == user_id,
+            )
+        ).all()
+        if len(existing) >= MAX_ATTEMPTS_PER_QUIZ:
+            raise ValueError("Bu quiz için deneme hakkınız doldu (2/2).")
+
     questions = {q.id: q for q in get_questions_for_quiz(quiz_id)}
     total = 0.0
     score = 0.0
@@ -163,7 +191,37 @@ def grade_attempt(quiz_id: int, user_id: int, answers: List[Dict[str, Any]]):
     return {'score': score, 'max_score': total, 'per_question': per_q, 'attempt_id': attempt.id}
 
 
-def get_attempts_for_class(class_id: int, quiz_id: int = None, user_email: str = None, since: str = None, until: str = None):
+def get_attempt_count(quiz_id: int, user_id: int) -> int:
+    with get_session() as session:
+        attempts = session.exec(
+            select(Attempt).where(
+                Attempt.quiz_id == quiz_id,
+                Attempt.user_id == user_id,
+            )
+        ).all()
+        return len(attempts)
+
+
+def delete_attempt(attempt_id: int, user_id: int) -> bool:
+    with get_session() as session:
+        attempt = session.get(Attempt, attempt_id)
+        if not attempt:
+            raise ValueError("Attempt not found")
+        if attempt.user_id != user_id:
+            raise PermissionError("Attempt owner mismatch")
+        session.delete(attempt)
+        session.commit()
+        return True
+
+
+def get_attempts_for_class(
+    class_id: int,
+    quiz_id: int = None,
+    user_email: str = None,
+    since: str = None,
+    until: str = None,
+    best_only: bool = False,
+):
     """Return attempts for a class with optional filters.
     since/until should be ISO date strings (YYYY-MM-DD) or None.
     """
@@ -216,7 +274,23 @@ def get_attempts_for_class(class_id: int, quiz_id: int = None, user_email: str =
                 'per_question': json.loads(at.per_question) if at.per_question else None,
                 'finished_at': at.finished_at.isoformat() if at.finished_at else None
             })
-        return results
+        if not best_only:
+            return results
+
+        best = {}
+        for item in results:
+            key = (item["user_id"], item["quiz_id"])
+            existing = best.get(key)
+            if existing is None:
+                best[key] = item
+                continue
+            if item["score"] > existing["score"]:
+                best[key] = item
+                continue
+            if item["score"] == existing["score"]:
+                if (item.get("finished_at") or "") > (existing.get("finished_at") or ""):
+                    best[key] = item
+        return list(best.values())
 
 
 def get_attempt_detail(attempt_id: int):

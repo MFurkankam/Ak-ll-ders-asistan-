@@ -14,6 +14,9 @@ from utils.quiz import (
     publish_quiz,
     get_questions_for_quiz,
     grade_attempt,
+    get_attempt_count,
+    delete_attempt,
+    delete_quiz,
     compute_topic_mastery,
     get_attempts_for_class,
     get_attempt_detail,
@@ -110,8 +113,26 @@ if show_class_detail and selected_class_id:
         """,
         unsafe_allow_html=True,
     )
+    st.markdown(
+        f"<div style='text-align:right;color:#80ed99;font-weight:600;'>"
+        f"Sınıf Kodu: {active_class.code}</div>",
+        unsafe_allow_html=True,
+    )
 
     if user_role == "student":
+        last_result = st.session_state.get("last_attempt_result")
+        if last_result and last_result.get("class_id") == active_class.id:
+            st.markdown("---")
+            st.subheader("Son Deneme Sonucu")
+            st.success(
+                f"Puan: {format_score(last_result['score'], last_result['max_score'])}"
+            )
+            for idx, pqres in enumerate(last_result.get("per_question", []), start=1):
+                st.write(
+                    f"Soru {idx}: "
+                    f"{'Doğru' if pqres['correct'] else 'Yanlış'}"
+                )
+
         st.subheader("Yayınlanan Quizler")
         quizzes = get_quizzes_for_class(active_class.id)
         pub_quizzes = [q for q in quizzes if q.published]
@@ -122,10 +143,18 @@ if show_class_detail and selected_class_id:
                         "Oluşturan: "
                         f"{pq.author_id} - Oluşturuldu: {format_compact_time(pq.created_at)}"
                     )
-                    if st.button("Quiz'e Katıl", key=f"att_{pq.id}"):
+                    attempt_count = get_attempt_count(pq.id, st.session_state.user["id"])
+                    if attempt_count >= 2:
+                        st.warning("Bu quiz için deneme hakkınız doldu (2/2).")
+                    if st.button(
+                        "Quiz'e Katıl",
+                        key=f"att_{pq.id}",
+                        disabled=attempt_count >= 2,
+                    ):
                         qs = get_questions_for_quiz(pq.id)
                         st.session_state.current_attempt = {
                             "quiz_id": pq.id,
+                            "class_id": active_class.id,
                             "questions": [
                                 {
                                     "id": q.id,
@@ -136,6 +165,7 @@ if show_class_detail and selected_class_id:
                                 for q in qs
                             ],
                         }
+                        st.session_state.last_attempt_result = None
                         st.rerun()
         else:
             st.info("Henüz yayınlanmış bir quiz yok.")
@@ -147,18 +177,28 @@ if show_class_detail and selected_class_id:
         )
         if attempts:
             for a in attempts:
-                with st.expander(
-                    f"{format_compact_time(a['finished_at'])} | {a['quiz_title']} | "
-                    f"{format_score(a['score'], a['max_score'])}"
-                ):
-                    st.write(f"Attempt ID: {a['attempt_id']}")
-                    det = get_attempt_detail(a["attempt_id"])
-                    if det:
-                        for pq in det["per_question"]:
-                            st.write(
-                                f"- ({'Doğru' if pq['correct'] else 'Yanlış'}) "
-                                f"{pq['question_text']} [{pq['points']}]"
-                            )
+                col_left, col_right = st.columns([0.9, 0.1])
+                with col_left:
+                    with st.expander(
+                        f"{format_compact_time(a['finished_at'])} | {a['quiz_title']} | "
+                        f"{format_score(a['score'], a['max_score'])}"
+                    ):
+                        det = get_attempt_detail(a["attempt_id"])
+                        if det:
+                            for idx, pq in enumerate(det["per_question"], start=1):
+                                st.write(
+                                    f"- Soru {idx} "
+                                    f"({'Doğru' if pq['correct'] else 'Yanlış'}) "
+                                    f"{pq['question_text']} [{pq['points']}]"
+                                )
+                with col_right:
+                    if st.button("🗑️", key=f"del_attempt_{a['attempt_id']}"):
+                        try:
+                            delete_attempt(a["attempt_id"], st.session_state.user["id"])
+                            st.session_state.last_attempt_result = None
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Hata: {e}")
         else:
             st.info("Henüz deneme yok.")
 
@@ -177,7 +217,7 @@ if show_class_detail and selected_class_id:
                             "Oluşturan: "
                             f"{q.author_id} - Oluşturuldu: {format_compact_time(q.created_at)}"
                         )
-                        col_a, col_b = st.columns([1, 1])
+                        col_a, col_b, col_c = st.columns([1, 1, 0.2])
                         with col_a:
                             if st.button(
                                 "Yayınla" if not q.published else "Yayını Kapat",
@@ -192,14 +232,22 @@ if show_class_detail and selected_class_id:
                         with col_b:
                             if st.button("Soruları Görüntüle", key=f"view_{q.id}"):
                                 questions = get_questions_for_quiz(q.id)
-                                for qq in questions:
-                                    st.write(f"- ({qq.type}) {qq.text} [{qq.points} puan]")
+                                for idx, qq in enumerate(questions, start=1):
+                                    st.write(f"- Soru {idx} ({qq.type}) {qq.text} [{qq.points} puan]")
+                        with col_c:
+                            if st.button("🗑️", key=f"del_quiz_{q.id}"):
+                                try:
+                                    delete_quiz(q.id, st.session_state.user["id"])
+                                    st.success("Quiz silindi.")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Hata: {e}")
             else:
                 st.info("Henüz bu sınıfa ait quiz yok.")
 
         with tab_students:
             st.subheader("Öğrenci Listesi")
-            attempts_all = get_attempts_for_class(active_class.id)
+            attempts_all = get_attempts_for_class(active_class.id, best_only=True)
             if attempts_all:
                 stats = {}
                 for a in attempts_all:
@@ -234,7 +282,7 @@ if show_class_detail and selected_class_id:
             if sel_quiz_title != "Tüm quizler":
                 sel_quiz_id = [q for q in quizzes if q.title == sel_quiz_title][0].id
 
-            all_attempts = get_attempts_for_class(active_class.id)
+            all_attempts = get_attempts_for_class(active_class.id, best_only=True)
             student_opts = ["Tümü"] + sorted({a["user_email"] for a in all_attempts})
             sel_student = st.selectbox(
                 "Öğrenci",
@@ -265,6 +313,7 @@ if show_class_detail and selected_class_id:
                 user_email=sel_student_email,
                 since=since,
                 until=until,
+                best_only=True,
             )
 
             if attempts:
@@ -307,9 +356,10 @@ if show_class_detail and selected_class_id:
                         st.write(f"Attempt ID: {a['attempt_id']}")
                         det = get_attempt_detail(a["attempt_id"])
                         if det:
-                            for pq in det["per_question"]:
+                            for idx, pq in enumerate(det["per_question"], start=1):
                                 st.write(
-                                    f"- ({'Doğru' if pq['correct'] else 'Yanlış'}) "
+                                    f"- Soru {idx} "
+                                    f"({'Doğru' if pq['correct'] else 'Yanlış'}) "
                                     f"{pq['question_text']} [{pq['points']}]"
                                 )
             else:
@@ -338,7 +388,16 @@ if show_class_detail and selected_class_id:
                 st.info("Henüz deneme verisi yok.")
 
         st.markdown("---")
-        st.subheader("Otomatik Quiz Kaydet")
+        st.subheader("Yeni Eklenen Quizler")
+        new_quizzes = [q for q in quizzes if q.author_id == st.session_state.user["id"] and not q.published]
+        new_quizzes = sorted(new_quizzes, key=lambda q: q.created_at or datetime.min, reverse=True)
+        if new_quizzes:
+            for q in new_quizzes[:5]:
+                st.write(f"- {q.title} ({format_compact_time(q.created_at)})")
+        else:
+            st.info("Henüz yeni eklenen quiz yok.")
+
+        st.markdown("---")
         if st.session_state.quiz_questions:
             save_title = st.text_input("Quiz Başlığı")
             if st.button("Quizi Kaydet"):
@@ -451,7 +510,7 @@ else:
 
     for cls in classes:
         with cols[card_index % 3]:
-            label = f"{cls.title}\n{cls.code}"
+            label = f"{cls.title}"
             if st.button(label, key=f"class_card_{cls.id}", use_container_width=True):
                 st.session_state.selected_class_id = cls.id
                 st.session_state.show_class_detail = True
@@ -483,10 +542,11 @@ if st.session_state.get("current_attempt"):
         if q["type"] == "mcq":
             choices = q.get("choices") or {}
             st.radio(
-                f"Seçim {q['id']}",
+                f"mcq_{q['id']}",
                 options=list(choices.keys()),
                 key=f"ans_{q['id']}",
                 format_func=lambda opt, c=choices: f"{opt}) {c.get(opt, '')}" if c else opt,
+                label_visibility="collapsed",
             )
         elif q["type"] == "true_false":
             st.selectbox(
@@ -506,12 +566,12 @@ if st.session_state.get("current_attempt"):
             gathered.append({"question_id": q["id"], "answer": a})
         try:
             res = grade_attempt(attempt["quiz_id"], st.session_state.user["id"], gathered)
-            st.success(f"Puan: {format_score(res['score'], res['max_score'])}")
-            for pqres in res["per_question"]:
-                st.write(
-                    f"Soru {pqres['question_id']}: "
-                    f"{'Doğru' if pqres['correct'] else 'Yanlış'}"
-                )
+            st.session_state.last_attempt_result = {
+                "class_id": attempt.get("class_id"),
+                "score": res["score"],
+                "max_score": res["max_score"],
+                "per_question": res["per_question"],
+            }
             st.session_state.current_attempt = None
             st.rerun()
         except Exception as e:
