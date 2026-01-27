@@ -1,7 +1,10 @@
+import logging
 import streamlit as st
 
 from utils.app_state import init_app, get_collection_name
 from utils.ui import apply_global_styles, render_sidebar
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Soru-Cevap", page_icon="\U0001f4ac", layout="wide")
 
@@ -24,11 +27,13 @@ if st.session_state.groq_client is None:
     st.error("Önce Groq API Key girmen gerekiyor.")
     st.stop()
 
+
 sources = st.session_state.rag_processor.get_all_sources(collection_name)
 if not sources:
     st.warning("Henüz dosya yüklenmedi. Önce dosya yükle sayfasına git.")
     st.stop()
 
+selected_sources = st.multiselect("Kaynak filtrele (opsiyonel)", options=sources)
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
@@ -45,10 +50,13 @@ if user_question:
     })
 
     with st.spinner("Cevap hazırlanıyor..."):
+        sources_count = len(selected_sources) if selected_sources else len(sources)
+        k = st.session_state.rag_processor.get_dynamic_k(user_question, sources_count)
         relevant_docs = st.session_state.rag_processor.search_documents(
             user_question,
-            k=4,
+            k=k,
             collection_name=collection_name,
+            source_filter=selected_sources or None,
         )
         if relevant_docs:
             answer = st.session_state.groq_client.answer_question(

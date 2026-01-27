@@ -1,15 +1,19 @@
 from io import BytesIO
+import logging
 import os
 from typing import List
 import uuid
+import hashlib
 
 import chromadb
 from chromadb.utils import embedding_functions
+from chromadb.errors import NotFoundError
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-import PyPDF2
+from pypdf import PdfReader
 from docx import Document as DocxDocument
 
+logger = logging.getLogger(__name__)
 
 class RAGProcessor:
     """RAG işleme sınıfı - yerel ChromaDB vektör veritabanı"""
@@ -20,9 +24,11 @@ class RAGProcessor:
         self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
         self.chroma_client = chromadb.PersistentClient(path=persist_directory)
 
+        chunk_size = int(os.getenv("RAG_CHUNK_SIZE", "1000"))
+        chunk_overlap = int(os.getenv("RAG_CHUNK_OVERLAP", "200"))
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             length_function=len,
             separators=[
                 "\n\n",
@@ -31,6 +37,21 @@ class RAGProcessor:
                 "",
             ],
         )
+
+
+    def get_dynamic_k(self, query: str, sources_count: int = 0) -> int:
+        min_k = int(os.getenv("RAG_MIN_K", "4"))
+        max_k = int(os.getenv("RAG_MAX_K", "8"))
+        words = len((query or "").split())
+        if words >= 20:
+            base_k = 8
+        elif words >= 12:
+            base_k = 6
+        else:
+            base_k = 4
+        if sources_count > 0:
+            base_k = base_k + min(4, sources_count // 3)
+        return max(min_k, min(max_k, base_k))
 
     def _resolve_tesseract_cmd(self, pytesseract):
         configured = os.getenv("TESSERACT_CMD")
@@ -106,10 +127,11 @@ class RAGProcessor:
 
             text_parts = []
             try:
-                pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_bytes))
+                pdf_reader = PdfReader(BytesIO(pdf_bytes))
                 for page in pdf_reader.pages:
                     text_parts.append(page.extract_text() or "")
             except Exception:
+                logger.exception("PDF metin cikarma hatasi")
                 text_parts = []
 
             text = "\n".join(text_parts).strip()
@@ -179,11 +201,11 @@ class RAGProcessor:
             texts = [doc.page_content for doc in documents]
             metadatas = [doc.metadata for doc in documents]
             ids = [
-                f"{doc.metadata.get('source', 'unknown')}_{uuid.uuid4().hex}"
+                f"{doc.metadata.get('source', 'unknown')}_{doc.metadata.get('chunk_id', '0')}_{hashlib.sha256(doc.page_content.encode('utf-8')).hexdigest()[:12]}"
                 for doc in documents
             ]
 
-            collection.add(
+            collection.upsert(
                 documents=texts,
                 metadatas=metadatas,
                 ids=ids,
@@ -201,7 +223,11 @@ class RAGProcessor:
                 embedding_function=self.embedding_function,
             )
             return collection
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, NotFoundError):
+                logger.info("Chroma koleksiyon bulunamadi: %s", collection_name)
+            else:
+                logger.exception("Chroma koleksiyon alma hatasi")
             return None
 
     def search_documents(
@@ -209,6 +235,7 @@ class RAGProcessor:
         query: str,
         k: int = 4,
         collection_name: str = "ders_notlari",
+        source_filter: List[str] | None = None,
     ) -> List[Document]:
         """Sorguya göre en ilgili dokümanları bul"""
         collection = self.get_collection(collection_name)
@@ -216,10 +243,24 @@ class RAGProcessor:
             return []
 
         try:
-            results = collection.query(
-                query_texts=[query],
-                n_results=k,
-            )
+            where = None
+            if source_filter:
+                if len(source_filter) == 1:
+                    where = {"source": source_filter[0]}
+                else:
+                    where = {"source": {"$in": source_filter}}
+
+            if where is None:
+                results = collection.query(
+                    query_texts=[query],
+                    n_results=k,
+                )
+            else:
+                results = collection.query(
+                    query_texts=[query],
+                    n_results=k,
+                    where=where,
+                )
 
             docs = []
             if results and "documents" in results and results["documents"]:
@@ -228,8 +269,12 @@ class RAGProcessor:
                     metadata = metadatas[0][i] if metadatas else {}
                     docs.append(Document(page_content=doc_text, metadata=metadata))
 
+            source_label = "all" if not source_filter else ",".join(source_filter)
+            logger.info(f"RAG search: k={k} sources={source_label} results={len(docs)}")
+
             return docs
         except Exception:
+            logger.exception("Chroma sorgu hatasi")
             return []
 
     def get_all_sources(self, collection_name: str = "ders_notlari") -> List[str]:
@@ -249,6 +294,7 @@ class RAGProcessor:
 
             return sorted(list(sources))
         except Exception:
+            logger.exception("Chroma kaynak listeleme hatasi")
             return []
 
     def delete_collection(self, collection_name: str = "ders_notlari"):
@@ -257,4 +303,5 @@ class RAGProcessor:
             self.chroma_client.delete_collection(name=collection_name)
             return True
         except Exception:
+            logger.exception("Chroma koleksiyon silme hatasi")
             return False

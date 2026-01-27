@@ -2,12 +2,15 @@ import os
 import uuid
 import streamlit as st
 
+from utils.logging_config import setup_logging
+
 from utils.db import init_db
 from utils.rag_processor import RAGProcessor
 from utils.groq_client import GroqClient
 
 
 def init_app():
+    setup_logging()
     init_db()
 
     if "rag_processor" not in st.session_state:
@@ -34,6 +37,9 @@ def init_app():
 
     if "uploaded_files" not in st.session_state:
         st.session_state.uploaded_files = []
+
+    if "saved_summaries" not in st.session_state:
+        st.session_state.saved_summaries = []
 
 
 def get_user_collection_name(user_id: int) -> str:
@@ -86,6 +92,9 @@ def migrate_anon_collection_to_user(rag_processor, anon_collection_name, user_co
         else:
             target.add(documents=docs, metadatas=metadatas, ids=ids)
     except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Anon koleksiyon tasima hatasi")
         return 0
     rag_processor.delete_collection(collection_name=anon_collection_name)
     return len(docs)

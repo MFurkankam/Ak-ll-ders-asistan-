@@ -1,16 +1,22 @@
+import logging
+import logging
 import os
+import unicodedata
 from typing import List, Dict, Any, Optional
 from groq import Groq
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
 
+logger = logging.getLogger(__name__)
+
 
 class GroqClient:
     """Groq API istemcisi - Cloud LLM entegrasyonu"""
     
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        raw_key = api_key or os.getenv("GROQ_API_KEY")
+        self.api_key = raw_key.strip() if raw_key else None
         if not self.api_key:
             raise ValueError("GROQ_API_KEY eksik")
         
@@ -25,44 +31,83 @@ class GroqClient:
             max_tokens=2048
         )
     
+    def _contains_non_turkish(self, text: str) -> bool:
+        for ch in text:
+            if ch.isalpha():
+                name = unicodedata.name(ch, "")
+                if "LATIN" not in name:
+                    return True
+        return False
+
+    def _invoke_with_retry(self, prompt_template: str, inputs: dict, retry_note: str) -> str:
+        prompt = PromptTemplate.from_template(prompt_template)
+        chain = prompt | self.llm
+        result = chain.invoke(inputs).content.strip()
+        if self._contains_non_turkish(result):
+            retry_template = prompt_template + "\n\n" + retry_note
+            prompt = PromptTemplate.from_template(retry_template)
+            chain = prompt | self.llm
+            result = chain.invoke(inputs).content.strip()
+        return result
+
     def generate_summary(
-        self, 
-        context: str, 
+        self,
+        context: str,
         detail_level: str = "orta"
     ) -> str:
-        """Ders notlarını özetle"""
-        
+        """Ders notlarini ozetle"""
+
+        level = (detail_level or "").lower()
+        level = (
+            level.replace("\u00e7", "c")
+            .replace("\u011f", "g")
+            .replace("\u0131", "i")
+            .replace("\u00f6", "o")
+            .replace("\u015f", "s")
+            .replace("\u00fc", "u")
+        )
+        if "cok" in level and "detay" in level:
+            key = "cok_detayli"
+        elif "detay" in level:
+            key = "detayli"
+        elif "k" in level and "sa" in level:
+            key = "kisa"
+        else:
+            key = "orta"
+
         detail_instructions = {
-            "kısa": "Çok kısa ve öz bir özet yap (3-5 madde)",
-            "orta": "Orta uzunlukta, ana noktaları kapsayan bir özet yap",
-            "detaylı": (
-                "Detaylı ve kapsamlı bir özet yap, "
-                "önemli tüm noktaları dahil et"
-            )
+            "kisa": "Cok kisa ve oz bir ozet yap (3-5 madde)",
+            "orta": "Orta uzunlukta, ana noktalari kapsayan bir ozet yap",
+            "detayli": "Detayli ve kapsamli bir ozet yap, onemli tum noktalari dahil et",
+            "cok_detayli": (
+                "Cok detayli bir ozet yaz. Metin uzunsa 2-3 sayfa "
+                "uzunlugunda (yaklasik 1200-1800 kelime) olmasini hedefle."
+            ),
         }
-        
-        instruction = detail_instructions.get(detail_level)
-        if instruction is None:
-            instruction = detail_instructions["orta"]
-        
-        prompt_template = """Aşağıdaki ders notlarını Türkçe olarak özetle.
+
+        instruction = detail_instructions.get(key, detail_instructions["orta"])
+
+        prompt_template = """Asagidaki ders notlarini Turkce olarak ozetle.
 
 {instruction}
 
-Ders Notları:
+Yanit yalnizca Turkce olmali, Turkce karakterleri (c/ç, g/ğ, i/ı, o/ö, s/ş, u/ü) dogru kullanmali ve ogretici, net bir dil kullanmali.
+
+Ders Notlari:
 {context}
 
-ÖZET:"""
+OZET:"""
 
-        prompt = PromptTemplate.from_template(prompt_template)
-        
         try:
-            chain = prompt | self.llm
-            result = chain.invoke({"context": context, "instruction": instruction})
-            return result.content.strip()
-        except Exception as e:
-            return f"Özet oluşturulurken hata: {str(e)}"
-    
+            return self._invoke_with_retry(
+                prompt_template,
+                {"context": context, "instruction": instruction},
+                "Yanit yalnizca Turkce olmali ve Turkce karakterleri dogru kullanmali.",
+            )
+        except Exception:
+            logger.exception("Ozet olusturma hatasi")
+            return "Ozet olusturulamadi. Lutfen tekrar deneyin."
+
     def generate_flashcards(
         self, 
         context: str, 
@@ -95,8 +140,9 @@ KART 2:
             chain = prompt | self.llm
             result = chain.invoke({"context": context, "num_cards": num_cards})
             return self._parse_flashcard_response(result.content)
-        except Exception as e:
-            return [{"error": f"Flashcard oluşturulurken hata: {str(e)}"}]
+        except Exception:
+            logger.exception("Flashcard olusturma hatasi")
+            return [{"error": "Flashcard olusturulamadi. Lutfen tekrar deneyin."}]
     
     def _parse_flashcard_response(self, response: str) -> List[Dict[str, str]]:
         """Flashcard yanıtını parse et"""
@@ -177,29 +223,31 @@ KART 2:
             difficulty_instructions.get(difficulty) or difficulty_instructions["orta"]
         )
 
-        prompt_template = """Aşağıdaki ders notlarından {num_questions} adet çoktan seçmeli soru oluştur.
+        prompt_template = """Asagidaki ders notlarindan {num_questions} adet coktan secmeli soru olustur.
+
+Yanit yalnizca Turkce olmali. Dogru cevap secenegi aciklama ile uyumlu olmali.
 
 {difficulty_instruction}
 
-Her soru için:
-- Soru metni (Türkçe)
-- 4 seçenek (A, B, C, D)
-- Doğru cevap (A, B, C veya D)
-- Kısa açıklama
+Her soru icin:
+- Soru metni (Turkce)
+- 4 secenek (A, B, C, D)
+- Dogru cevap (A, B, C veya D)
+- Kisa aciklama
 
-Ders Notları:
+Ders Notlari:
 {context}
 
-Lütfen aşağıdaki formatta yanıt ver:
+Lutfen asagidaki formatta yanit ver:
 
 SORU 1:
 Soru: [Soru metni]
-A) [Seçenek A]
-B) [Seçenek B]
-C) [Seçenek C]
-D) [Seçenek D]
-Doğru Cevap: [A/B/C/D]
-Açıklama: [Kısa açıklama]
+A) [Secenek A]
+B) [Secenek B]
+C) [Secenek C]
+D) [Secenek D]
+Dogru Cevap: [A/B/C/D]
+Aciklama: [Kisa aciklama]
 
 SORU 2:
 ...
@@ -217,8 +265,9 @@ SORU 2:
                 }
             )
             return self._parse_quiz_response(result.content)
-        except Exception as e:
-            return [{"error": f"Quiz oluşturulurken hata: {str(e)}"}]
+        except Exception:
+            logger.exception("Quiz olusturma hatasi (mcq)")
+            return [{"error": "Quiz olusturulamadi. Lutfen tekrar deneyin."}]
     
     def _parse_quiz_response(self, response: str) -> List[Dict[str, Any]]:
         """Quiz yanıtını parse et"""
@@ -293,24 +342,26 @@ SORU 2:
         }
         difficulty_instruction = difficulty_instructions.get(difficulty, difficulty_instructions["orta"])
         
-        prompt_template = """Aşağıdaki ders notlarından {num_questions} adet Doğru/Yanlış sorusu oluştur.
+        prompt_template = """Asagidaki ders notlarindan {num_questions} adet Dogru/Yanlis sorusu olustur.
+
+Yanit yalnizca Turkce olmali.
 
 {difficulty_instruction}
 
-Her soru için:
-- İfade (Türkçe)
-- Doğru cevap (Doğru veya Yanlış)
-- Kısa açıklama
+Her soru icin:
+- Ifade (Turkce)
+- Dogru cevap (Dogru veya Yanlis)
+- Kisa aciklama
 
-Ders Notları:
+Ders Notlari:
 {context}
 
-Lütfen aşağıdaki formatta yanıt ver:
+Lutfen asagidaki formatta yanit ver:
 
 SORU 1:
-İfade: [İfade metni]
-Doğru Cevap: [Doğru/Yanlış]
-Açıklama: [Kısa açıklama]
+Ifade: [Ifade metni]
+Dogru Cevap: [Dogru/Yanlis]
+Aciklama: [Kisa aciklama]
 
 SORU 2:
 ...
@@ -326,8 +377,9 @@ SORU 2:
                 "difficulty_instruction": difficulty_instruction
             })
             return self._parse_true_false_response(result.content)
-        except Exception as e:
-            return [{"error": f"Quiz oluşturulurken hata: {str(e)}"}]
+        except Exception:
+            logger.exception("Quiz olusturma hatasi (mcq)")
+            return [{"error": "Quiz olusturulamadi. Lutfen tekrar deneyin."}]
     
     def _generate_fill_blank_quiz(
         self, 
@@ -344,24 +396,26 @@ SORU 2:
         }
         difficulty_instruction = difficulty_instructions.get(difficulty, difficulty_instructions["orta"])
         
-        prompt_template = """Aşağıdaki ders notlarından {num_questions} adet boşluk doldurma sorusu oluştur.
+        prompt_template = """Asagidaki ders notlarindan {num_questions} adet bosluk doldurma sorusu olustur.
+
+Yanit yalnizca Turkce olmali.
 
 {difficulty_instruction}
 
-Her soru için:
-- Boşluklu cümle (_____ ile boşluk işaretle)
-- Doğru cevap
-- Kısa açıklama
+Her soru icin:
+- Bosluklu cumle (_____ ile bosluk isaretle)
+- Dogru cevap
+- Kisa aciklama
 
-Ders Notları:
+Ders Notlari:
 {context}
 
-Lütfen aşağıdaki formatta yanıt ver:
+Lutfen asagidaki formatta yanit ver:
 
 SORU 1:
-Cümle: [Boşluklu cümle metni]
-Doğru Cevap: [Doğru kelime/kelimeler]
-Açıklama: [Kısa açıklama]
+Cumle: [Bosluklu cumle metni]
+Dogru Cevap: [Dogru kelime/kelimeler]
+Aciklama: [Kisa aciklama]
 
 SORU 2:
 ...
@@ -377,8 +431,9 @@ SORU 2:
                 "difficulty_instruction": difficulty_instruction
             })
             return self._parse_fill_blank_response(result.content)
-        except Exception as e:
-            return [{"error": f"Quiz oluşturulurken hata: {str(e)}"}]
+        except Exception:
+            logger.exception("Quiz olusturma hatasi (mcq)")
+            return [{"error": "Quiz olusturulamadi. Lutfen tekrar deneyin."}]
     
     def _generate_short_answer_quiz(
         self, 
@@ -395,23 +450,25 @@ SORU 2:
         }
         difficulty_instruction = difficulty_instructions.get(difficulty, difficulty_instructions["orta"])
         
-        prompt_template = """Aşağıdaki ders notlarından {num_questions} adet kısa cevaplı soru oluştur.
+        prompt_template = """Asagidaki ders notlarindan {num_questions} adet kisa cevapli soru olustur.
+
+Yanit yalnizca Turkce olmali.
 
 {difficulty_instruction}
 
-Her soru için:
-- Soru metni (Türkçe)
-- Örnek cevap
+Her soru icin:
+- Soru metni (Turkce)
+- Ornek cevap
 - Anahtar kelimeler
 
-Ders Notları:
+Ders Notlari:
 {context}
 
-Lütfen aşağıdaki formatta yanıt ver:
+Lutfen asagidaki formatta yanit ver:
 
 SORU 1:
 Soru: [Soru metni]
-Örnek Cevap: [Örnek cevap]
+Ornek Cevap: [Ornek cevap]
 Anahtar Kelimeler: [kelime1, kelime2, kelime3]
 
 SORU 2:
@@ -428,8 +485,9 @@ SORU 2:
                 "difficulty_instruction": difficulty_instruction
             })
             return self._parse_short_answer_response(result.content)
-        except Exception as e:
-            return [{"error": f"Quiz oluşturulurken hata: {str(e)}"}]
+        except Exception:
+            logger.exception("Quiz olusturma hatasi (mcq)")
+            return [{"error": "Quiz olusturulamadi. Lutfen tekrar deneyin."}]
     
     def _parse_true_false_response(self, response: str) -> List[Dict[str, Any]]:
         """Doğru/Yanlış quiz yanıtını parse et"""
@@ -557,33 +615,38 @@ SORU 2:
         return valid_questions if valid_questions else [{"error": "Quiz parse edilemedi"}]
     
     def answer_question(
-        self, 
-        question: str, 
+        self,
+        question: str,
         context_docs: List[Document]
     ) -> str:
-        """Kullanıcı sorusuna ders notlarından yararlanarak cevap ver"""
-        
-        # Dokümanlardan bağlam oluştur
-        context = "\n\n".join([doc.page_content for doc in context_docs])
-        
-        prompt_template = """Aşağıdaki ders notlarını kullanarak soruya Türkçe cevap ver.
+        """Kullanici sorusuna ders notlarindan yararlanarak cevap ver"""
 
-Ders Notları:
+        context = "\n\n".join([doc.page_content for doc in context_docs])
+
+        prompt_template = """Asagidaki ders notlarini kullanarak soruya Turkce cevap ver.
+
+Yanit dogal ve anlasilir olsun.
+Soru bir selamlama veya kisa sohbet ise kisa ve samimi cevap ver, ders notlarina zorla baglama.
+Gerektiginde madde listesi kullan, sabit numarali bir format uygulama.
+Yabanci dilde kelime veya ifade kullanma.
+
+Ders Notlari:
 {context}
 
 Soru: {question}
 
 Cevap:"""
 
-        prompt = PromptTemplate.from_template(prompt_template)
-        
         try:
-            chain = prompt | self.llm
-            result = chain.invoke({"context": context, "question": question})
-            return result.content.strip()
-        except Exception as e:
-            return f"Cevap oluşturulurken hata: {str(e)}"
-    
+            return self._invoke_with_retry(
+                prompt_template,
+                {"context": context, "question": question},
+                "Yanit yalnizca Turkce olmali. Latin alfabesi disinda karakter kullanma.",
+            )
+        except Exception:
+            logger.exception("Soru cevaplama hatasi")
+            return "Cevap olusturulamadi. Lutfen tekrar deneyin."
+
     def chat(
         self, 
         message: str, 
@@ -614,7 +677,22 @@ Cevap:"""
                 temperature=0.7,
                 max_tokens=2048
             )
-            
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"Cevap oluşturulurken hata: {str(e)}"
+            content = response.choices[0].message.content
+            if self._contains_non_turkish(content):
+                retry_messages = [
+                    {
+                        "role": "system",
+                        "content": "Yanit yalnizca Turkce olmali. Latin alfabesi disinda karakter kullanma.",
+                    }
+                ] + messages
+                response = self.client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=retry_messages,
+                    temperature=0.7,
+                    max_tokens=2048
+                )
+                content = response.choices[0].message.content
+            return content
+        except Exception:
+            logger.exception("Sohbet cevabi hatasi")
+            return "Cevap olusturulamadi. Lutfen tekrar deneyin."

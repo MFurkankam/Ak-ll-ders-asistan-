@@ -85,3 +85,19 @@ def delete_class(class_id: int, user_id: int):
         session.exec(delete(Class).where(Class.id == class_id))
         session.commit()
         return True
+
+
+def update_class(class_id: int, user_id: int, title: str, description: str | None = None) -> Class:
+    with get_session() as session:
+        cls = session.get(Class, class_id)
+        if not cls:
+            raise ValueError("Class not found")
+        if cls.owner_id != user_id:
+            raise PermissionError("Only class owner can update the class")
+
+        cls.title = title
+        cls.description = description
+        session.add(cls)
+        session.commit()
+        session.refresh(cls)
+        return cls

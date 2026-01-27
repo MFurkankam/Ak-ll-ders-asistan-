@@ -159,3 +159,30 @@ class Attempt(SQLModel, table=True):
     def _reconcilation_set_started_at(self):
         if getattr(self, 'started_at', None) is not None and self.started_at.tzinfo is None:
             self.started_at = self.started_at.replace(tzinfo=timezone.utc)
+
+
+class Summary(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    title: str
+    content: str
+    created_at: datetime = Field(
+        default_factory=now_utc,
+        sa_column=Column(
+            SA_DateTime(timezone=True),
+            default=now_utc,
+        ),
+    )
+
+    @field_validator('created_at', mode='before')
+    def _ensure_created_at_tz(cls, v):
+        if v is None:
+            return now_utc()
+        if v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
+    @reconstructor
+    def _reconcilation_set_created_at(self):
+        if getattr(self, 'created_at', None) is not None and self.created_at.tzinfo is None:
+            self.created_at = self.created_at.replace(tzinfo=timezone.utc)

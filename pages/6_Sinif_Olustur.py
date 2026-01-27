@@ -1,8 +1,11 @@
+import logging
 import streamlit as st
 
 from utils.app_state import init_app, get_collection_name
 from utils.ui import apply_global_styles, render_sidebar
 from utils.classes import create_class
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Sınıf Oluştur", page_icon="➕", layout="wide")
 
@@ -52,5 +55,6 @@ if st.button("Oluştur", type="primary"):
             st.session_state.show_class_detail = True
             st.session_state.last_class_id = cls.id
             st.switch_page("pages/5_Siniflar.py")
-        except Exception as e:
-            st.error(f"Hata: {e}")
+        except Exception:
+            logger.exception("Sinif olusturma hatasi")
+            st.error("Sinif olusturulamadi. Lutfen tekrar deneyin.")

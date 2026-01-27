@@ -14,7 +14,7 @@ python -m pip install -r requirements.txt
 
 3) Run Streamlit:
 ```bash
-set DATABASE_URL=postgresql+psycopg2://akilli:akilli_pass@localhost:5432/akilli_db
+set DATABASE_URL=postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db
 python -m streamlit run app.py
 ```
 

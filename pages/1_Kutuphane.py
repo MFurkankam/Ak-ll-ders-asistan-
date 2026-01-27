@@ -1,7 +1,10 @@
+import logging
 import streamlit as st
 
 from utils.app_state import init_app, get_collection_name
 from utils.ui import apply_global_styles, render_sidebar
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Kütüphane", page_icon="📚", layout="wide")
 
@@ -43,8 +46,9 @@ if uploaded_file is not None:
                 st.success(f"{uploaded_file.name} başarıyla yüklendi ve işlendi.")
                 st.success(f"{len(documents)} metin parçası oluşturuldu.")
                 st.rerun()
-            except Exception as e:
-                st.error(f"Hata: {str(e)}")
+            except Exception:
+                logger.exception("Dosya yukleme hatasi")
+                st.error("Dosya yuklenemedi. Lutfen tekrar deneyin.")
 
 st.markdown("---")
 

@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+import logging
 from utils.db import get_session
 from utils.models import Quiz, Question, Attempt
 from sqlmodel import select
@@ -6,6 +7,7 @@ import json
 from datetime import datetime, timezone
 import unicodedata
 
+logger = logging.getLogger(__name__)
 MAX_ATTEMPTS_PER_QUIZ = 2
 
 
@@ -137,6 +139,7 @@ def grade_attempt(quiz_id: int, user_id: int, answers: List[Dict[str, Any]]):
             try:
                 correct_val = json.loads(q.correct_answer)
             except Exception:
+                logger.exception("Dogru cevap JSON parse hatasi")
                 correct_val = q.correct_answer
         # MCQ or TF
         if q.type == 'mcq':
@@ -249,14 +252,14 @@ def get_attempts_for_class(
                 since_dt = datetime.fromisoformat(since)
                 aquery = aquery.where(Attempt.finished_at >= since_dt)
             except Exception:
-                pass
+                logger.exception("Tarih parse hatasi (since)")
         if until:
             try:
                 from datetime import datetime
                 until_dt = datetime.fromisoformat(until)
                 aquery = aquery.where(Attempt.finished_at <= until_dt)
             except Exception:
-                pass
+                logger.exception("Tarih parse hatasi (until)")
 
         attempts = list(session.exec(aquery))
         results = []
@@ -368,6 +371,7 @@ def compute_topic_mastery(class_id: int, attempts: list = None):
                     try:
                         topics = json.loads(qobj.topics)
                     except Exception:
+                        logger.exception("Konu listesi JSON parse hatasi")
                         # fallback comma separated
                         topics = [t.strip() for t in (qobj.topics or '').split(',') if t.strip()]
                 for t in topics:

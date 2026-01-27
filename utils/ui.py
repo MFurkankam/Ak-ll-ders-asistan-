@@ -1,3 +1,4 @@
+import logging
 import os
 import streamlit as st
 
@@ -8,6 +9,8 @@ from utils.app_state import (
     migrate_anon_collection_to_user,
 )
 from utils.groq_client import GroqClient
+
+logger = logging.getLogger(__name__)
 
 
 def apply_global_styles():
@@ -133,8 +136,9 @@ def render_auth():
                         st.rerun()
                     else:
                         st.error("Email veya parola hatalı")
-                except Exception as e:
-                    st.error(f"Hata: {e}")
+                except Exception:
+                    logger.exception("Giris hatasi")
+                    st.error("Giris yapilamadi. Lutfen tekrar deneyin.")
         else:
             reg_email = st.text_input("Email", key="reg_email")
             reg_name = st.text_input("Ad Soyad", key="reg_name")
@@ -150,8 +154,9 @@ def render_auth():
                     )
                     st.session_state.pending_auth_tab = True
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Hata: {e}")
+                except Exception:
+                    logger.exception("Kayit hatasi")
+                    st.error("Kayit tamamlanamadi. Lutfen tekrar deneyin.")
     else:
         name = st.session_state.user.get("full_name") or st.session_state.user.get("email")
         st.markdown(f"**Giriş yapan:** {name}")
@@ -182,9 +187,10 @@ def render_groq_status():
                     st.session_state.groq_api_key = api_key.strip()
                     st.success("API anahtarı kaydedildi.")
                     st.rerun()
-                except Exception as e:
+                except Exception:
+                    logger.exception("Groq API anahtari hatasi")
                     st.session_state.groq_client = None
-                    st.error(f"Hata: {e}")
+                    st.error("API anahtari kaydedilemedi. Lutfen tekrar deneyin.")
 
         st.warning("GROQ_API_KEY ayarlanmadı. Anahtar girin veya ortam değişkeni ekleyin.")
     else:

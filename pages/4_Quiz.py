@@ -1,10 +1,13 @@
 import json
+import logging
 import streamlit as st
 
 from utils.app_state import init_app, get_collection_name
 from utils.ui import apply_global_styles, render_sidebar
 from utils.classes import get_user_classes
 from utils.quiz import create_quiz
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Quiz", page_icon="\U0001f9ee", layout="wide")
 
@@ -31,6 +34,8 @@ sources = st.session_state.rag_processor.get_all_sources(collection_name)
 if not sources:
     st.warning("Henüz dosya yüklenmedi. Önce dosya yükle sayfasına git.")
     st.stop()
+
+selected_sources = st.multiselect("Kaynak filtrele (opsiyonel)", options=sources)
 
 col1, col2 = st.columns([3, 1])
 with col1:
@@ -63,17 +68,22 @@ with col4:
 if st.button("Quiz Oluştur", type="primary"):
     with st.spinner("Quiz oluşturuluyor..."):
         try:
+            sources_count = len(selected_sources) if selected_sources else len(sources)
             if quiz_topic:
+                k = st.session_state.rag_processor.get_dynamic_k(quiz_topic, sources_count)
                 docs = st.session_state.rag_processor.search_documents(
                     quiz_topic,
-                    k=6,
+                    k=k,
                     collection_name=collection_name,
+                    source_filter=selected_sources or None,
                 )
             else:
+                k = st.session_state.rag_processor.get_dynamic_k("genel bilgi", sources_count)
                 docs = st.session_state.rag_processor.search_documents(
                     "genel bilgi",
-                    k=6,
+                    k=k,
                     collection_name=collection_name,
+                    source_filter=selected_sources or None,
                 )
 
             if docs:
@@ -106,8 +116,9 @@ if st.button("Quiz Oluştur", type="primary"):
                     st.error("Quiz oluşturulamadı.")
             else:
                 st.error("İlgili içerik bulunamadı.")
-        except Exception as e:
-            st.error(f"Hata: {str(e)}")
+        except Exception:
+            logger.exception("Quiz olusturma hatasi")
+            st.error("Quiz olusturulamadi. Lutfen tekrar deneyin.")
 
 if st.session_state.quiz_questions:
     st.markdown("---")
@@ -156,6 +167,7 @@ if st.session_state.quiz_questions:
                 try:
                     return json.dumps(item, sort_keys=True, ensure_ascii=False)
                 except Exception:
+                    logger.exception("Quiz havuzu fingerprint hatasi")
                     return str(item)
 
             existing = {_fingerprint(x) for x in st.session_state.quiz_bank}
@@ -181,6 +193,10 @@ if st.session_state.quiz_questions:
             sel = st.selectbox("Sınıf seç", list(class_map.keys()))
             active_class = class_map.get(sel)
             save_title = st.text_input("Quiz Başlığı", value="Yeni Quiz")
+            topic_title = st.text_input(
+                "Konu başlığı",
+                placeholder="Örn: Tasarım Kalıpları",
+            )
             source_options = ["Yeni oluşturulan sorular"]
             if st.session_state.quiz_bank:
                 source_options.append("Havuzdaki sorular")
@@ -193,9 +209,11 @@ if st.session_state.quiz_questions:
 
             if st.button("Quizi Kaydet"):
                 try:
+                    topic_value = (topic_title or "").strip()
                     qlist = []
                     for gq in save_list:
                         qtype = gq.get('type') or gq.get('question_type') or 'mcq'
+                        topics = [topic_value] if topic_value else gq.get("topics", []) or gq.get("keywords", [])
                         if qtype in ('multiple_choice', 'mcq'):
                             choices = {k: v for k, v in gq.items() if k in ('A', 'B', 'C', 'D')}
                             correct = gq.get('correct_answer') or gq.get('correct')
@@ -204,7 +222,7 @@ if st.session_state.quiz_questions:
                                 'text': gq.get('question') or gq.get('question_text'),
                                 'choices': choices,
                                 'correct_answer': correct,
-                                'topics': gq.get('topics', []),
+                                'topics': topics,
                                 'points': 1.0,
                             })
                         elif qtype == 'true_false':
@@ -212,6 +230,7 @@ if st.session_state.quiz_questions:
                                 'type': 'true_false',
                                 'text': gq.get('statement') or gq.get('question'),
                                 'correct_answer': gq.get('correct_answer'),
+                                'topics': topics,
                                 'points': 1.0,
                             })
                         elif qtype == 'fill_blank':
@@ -219,6 +238,7 @@ if st.session_state.quiz_questions:
                                 'type': 'fill_blank',
                                 'text': gq.get('sentence'),
                                 'correct_answer': gq.get('correct_answer'),
+                                'topics': topics,
                                 'points': 1.0,
                             })
                         else:
@@ -226,7 +246,7 @@ if st.session_state.quiz_questions:
                                 'type': 'short_answer',
                                 'text': gq.get('question'),
                                 'correct_answer': gq.get('sample_answer') or gq.get('correct_answer'),
-                                'topics': gq.get('keywords', []),
+                                'topics': topics,
                                 'points': 1.0,
                             })
 
@@ -239,8 +259,9 @@ if st.session_state.quiz_questions:
                     st.success(f"Quiz kaydedildi: {created.title}")
                     st.session_state.quiz_questions = []
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Hata: {e}")
+                except Exception:
+                    logger.exception("Quiz kaydetme hatasi")
+                    st.error("Quiz kaydedilemedi. Lutfen tekrar deneyin.")
 
     if st.session_state.quiz_bank:
         st.markdown("---")
