@@ -1,50 +1,50 @@
-# Akýllý Ders Asistaný
+# Akï¿½llï¿½ Ders Asistanï¿½
 
-Ders notlarýný **yükleyip**, onlarýn içeriðine dayalý **soru-cevap**, **özet**, **quiz üretimi** ve **sýnýf yönetimi** sunan çok sayfalý bir **Streamlit** uygulamasý. Notlarýnýzdan güvenilir yanýtlar üretmek için **RAG (Retrieval Augmented Generation)** yaklaþýmýný kullanýr ve sonuçlarý analiz eden **raporlar** içerir.
-
----
-
-## Özellikler
-
-- **Not Yükleme ve Kütüphane** (PDF/DOCX/TXT)
-- **Notlara Dayalý Soru-Cevap (RAG + LLM)**
-- **Özetleme** (kýsa / orta / detaylý / çok detaylý)
-- **Quiz Üretimi** (Çoktan Seçmeli, Doðru-Yanlýþ, Boþluk Doldurma, Kýsa Cevap)
-- **Sýnýf Yönetimi** (oluþturma, katýlma, güncelleme, silme)
-- **Quiz Yayýnlama ve Deneme Limitleri**
-- **Raporlar** (konu baþarýsý, öðrenci segmenti, zaman trendi)
+Ders notlarï¿½nï¿½ **yï¿½kleyip**, onlarï¿½n iï¿½eriï¿½ine dayalï¿½ **soru-cevap**, **ï¿½zet**, **quiz ï¿½retimi** ve **sï¿½nï¿½f yï¿½netimi** sunan ï¿½ok sayfalï¿½ bir **Streamlit** uygulamasï¿½. Notlarï¿½nï¿½zdan gï¿½venilir yanï¿½tlar ï¿½retmek iï¿½in **RAG (Retrieval Augmented Generation)** yaklaï¿½ï¿½mï¿½nï¿½ kullanï¿½r ve sonuï¿½larï¿½ analiz eden **raporlar** iï¿½erir.
 
 ---
 
-## Teknoloji Yýðýný
+## ï¿½zellikler
 
-- **Python**, **Streamlit** (çok sayfalý arayüz)
+- **Not Yï¿½kleme ve Kï¿½tï¿½phane** (PDF/DOCX/TXT)
+- **Notlara Dayalï¿½ Soru-Cevap (RAG + LLM)**
+- **ï¿½zetleme** (kï¿½sa / orta / detaylï¿½ / ï¿½ok detaylï¿½)
+- **Quiz ï¿½retimi** (ï¿½oktan Seï¿½meli, Doï¿½ru-Yanlï¿½ï¿½, Boï¿½luk Doldurma, Kï¿½sa Cevap)
+- **Sï¿½nï¿½f Yï¿½netimi** (oluï¿½turma, katï¿½lma, gï¿½ncelleme, silme)
+- **Quiz Yayï¿½nlama ve Deneme Limitleri**
+- **Raporlar** (konu baï¿½arï¿½sï¿½, ï¿½ï¿½renci segmenti, zaman trendi)
+
+---
+
+## Teknoloji Yï¿½ï¿½ï¿½nï¿½
+
+- **Python**, **Streamlit** (ï¿½ok sayfalï¿½ arayï¿½z)
 - **Groq API + LangChain** (LLM entegrasyonu)
-- **ChromaDB** (vektör veritabaný / RAG)
-- **PostgreSQL + SQLModel/SQLAlchemy** (kalýcý veri)
+- **ChromaDB** (vektï¿½r veritabanï¿½ / RAG)
+- **PostgreSQL + SQLModel/SQLAlchemy** (kalï¿½cï¿½ veri)
 - **Alembic** (migrasyon)
 - **Pandas + Altair** (raporlar ve grafikler)
 - **pytest** (testler)
 
 ---
 
-## Hýzlý Baþlangýç (Local)
+## Hï¿½zlï¿½ Baï¿½langï¿½ï¿½ (Local)
 
-### 1) Baðýmlýlýklar
+### 1) Baï¿½ï¿½mlï¿½lï¿½klar
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### 2) Postgres (Docker ile önerilir)
+### 2) Postgres (Docker ile ï¿½nerilir)
 
 ```bash
 docker compose up -d db
 ```
 
-> Not: Postgres varsayýlan olarak **5433** portunda çalýþýr.
+> Not: Postgres varsayï¿½lan olarak **5433** portunda ï¿½alï¿½ï¿½ï¿½r.
 
-### 3) Ortam Deðiþkenleri
+### 3) Ortam Deï¿½iï¿½kenleri
 
 **Windows (PowerShell):**
 ```powershell
@@ -58,19 +58,19 @@ export GROQ_API_KEY="YOUR_GROQ_KEY"
 export DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
 ```
 
-### 4) Migrasyonlarý Çalýþtýr
+### 4) Migrasyonlarï¿½ ï¿½alï¿½ï¿½tï¿½r
 
 ```bash
 python -m alembic upgrade head
 ```
 
-### 5) Uygulamayý Baþlat
+### 5) Uygulamayï¿½ Baï¿½lat
 
 ```bash
 python -m streamlit run app.py --server.port 5000 --server.address 0.0.0.0
 ```
 
-Tarayýcýdan: **http://localhost:5000**
+Tarayï¿½cï¿½dan: **http://localhost:5000**
 
 ---
 
@@ -82,45 +82,45 @@ docker compose up --build
 
 ---
 
-## Ortam Deðiþkenleri
+## Ortam Deï¿½iï¿½kenleri
 
-| Deðiþken | Açýklama | Örnek |
+| Deï¿½iï¿½ken | Aï¿½ï¿½klama | ï¿½rnek |
 |---|---|---|
-| `GROQ_API_KEY` | Groq API anahtarý | `gsk_...` |
-| `DATABASE_URL` | PostgreSQL baðlantý URL’i | `postgresql+psycopg2://...` |
-| `RAG_CHUNK_SIZE` | RAG parça boyutu | `1000` |
-| `RAG_CHUNK_OVERLAP` | RAG parça overlap | `200` |
+| `GROQ_API_KEY` | Groq API anahtarï¿½ | `gsk_...` |
+| `DATABASE_URL` | PostgreSQL baï¿½lantï¿½ URLï¿½i | `postgresql+psycopg2://...` |
+| `RAG_CHUNK_SIZE` | RAG parï¿½a boyutu | `1000` |
+| `RAG_CHUNK_OVERLAP` | RAG parï¿½a overlap | `200` |
 
 ---
 
 ## Testler
 
-### SQLite ile (önerilir, hýzlý ve izole)
+### SQLite ile (ï¿½nerilir, hï¿½zlï¿½ ve izole)
 ```bash
 $env:DATABASE_URL="sqlite:///./test.db"
 python scripts\run_tests_direct.py
 ```
 
-### PostgreSQL 5433 ile
+### PostgreSQL ile
 ```bash
 $env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
 python scripts\run_tests_direct.py
 ```
 
-> Not: PostgreSQL üzerinde testler kalýcý veri býrakýr. Ayný testleri tekrar çalýþtýrýrken sýnýf kodu çakýþmasý olabilir. SQLite bu yüzden tavsiye edilir.
+> Not: PostgreSQL ï¿½zerinde testler kalï¿½cï¿½ veri bï¿½rakï¿½r. Aynï¿½ testleri tekrar ï¿½alï¿½ï¿½tï¿½rï¿½rken sï¿½nï¿½f kodu ï¿½akï¿½ï¿½masï¿½ olabilir. SQLite bu yï¿½zden tavsiye edilir.
 
 ---
 
-## Raporlar için Seed (Sahte Veri)
+## Raporlar iï¿½in Seed (Sahte Veri)
 
-Var olan sýnýfa raporlarý test etmek için sahte veri ekleyebilirsiniz:
+Var olan sï¿½nï¿½fa raporlarï¿½ test etmek iï¿½in sahte veri ekleyebilirsiniz:
 
 ```bash
 $env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
 python scripts\seed_reports.py --class-code 1RMMI1 --students 12 --quizzes 3 --topics 5 --questions 6
 ```
 
-Temizlemek için:
+Temizlemek iï¿½in:
 
 ```bash
 python scripts\seed_reports_cleanup.py --class-code 1RMMI1
@@ -128,64 +128,47 @@ python scripts\seed_reports_cleanup.py --class-code 1RMMI1
 
 ---
 
-## Proje Yapýsý
+## Proje Yapï¿½sï¿½
 
 ```
 .
-+¦ app.py
-+¦ pages/
--  +¦ 1_Dosya_Yukle.py
--  +¦ 2_Soru_Cevap.py
--  +¦ 3_Ozet.py
--  +¦ 4_Quiz.py
--  +¦ 5_Siniflar.py
--  L¦ ...
-+¦ utils/
--  +¦ groq_client.py
--  +¦ rag_processor.py
--  +¦ quiz.py
--  +¦ db.py
--  +¦ models.py
--  L¦ ...
-+¦ scripts/
--  +¦ run_tests_direct.py
--  +¦ seed_reports.py
--  L¦ seed_reports_cleanup.py
-+¦ tests/
-L¦ alembic/
++ï¿½ app.py
++ï¿½ pages/
+-  +ï¿½ 1_Dosya_Yukle.py
+-  +ï¿½ 2_Soru_Cevap.py
+-  +ï¿½ 3_Ozet.py
+-  +ï¿½ 4_Quiz.py
+-  +ï¿½ 5_Siniflar.py
+-  Lï¿½ ...
++ï¿½ utils/
+-  +ï¿½ groq_client.py
+-  +ï¿½ rag_processor.py
+-  +ï¿½ quiz.py
+-  +ï¿½ db.py
+-  +ï¿½ models.py
+-  Lï¿½ ...
++ï¿½ scripts/
+-  +ï¿½ run_tests_direct.py
+-  +ï¿½ seed_reports.py
+-  Lï¿½ seed_reports_cleanup.py
++ï¿½ tests/
+Lï¿½ alembic/
 ```
 
 ---
 
-## Sýk Karþýlaþýlan Sorunlar
+## Gï¿½venlik Notlarï¿½
 
-**1) “streamlit komutu bulunamadý”**
-- `python -m streamlit ...` þeklinde çalýþtýrýn.
-
-**2) Postgres 5432’ye baðlanýyor**
-- `DATABASE_URL`’i **5433** portu ile ayarlayýn.
-
-**3) Groq API key hatasý**
-- `GROQ_API_KEY` ortam deðiþkenini kontrol edin.
-
-**4) Raporlarda ýsý haritasý hatasý**
-- `matplotlib` yüklü olmalý: `python -m pip install matplotlib`
-
----
-
-## Güvenlik Notlarý
-
-- API anahtarlarýný **kod içine yazmayýn**, env var kullanýn.
-- Yüklenen notlar kullanýcý verisidir; eriþim ve saklama politikasý önemlidir.
+- Yï¿½klenen notlar kullanï¿½cï¿½ verisidir; eriï¿½im ve saklama politikasï¿½ ï¿½nemlidir.
 
 ---
 
 ## Lisans
 
-Þu an lisans belirtilmemiþtir. (Ýsterseniz MIT / Apache-2.0 vb. ekleyebiliriz.)
+ï¿½u an lisans belirtilmemiï¿½tir. (ï¿½sterseniz MIT / Apache-2.0 vb. ekleyebiliriz.)
 
 ---
 
-## Katký
+## Katkï¿½
 
-PR ve Issue’lar memnuniyetle kabul edilir. Büyük deðiþiklikler öncesi konu açýlmasý önerilir.
+PR ve Issueï¿½lar memnuniyetle kabul edilir. Bï¿½yï¿½k deï¿½iï¿½iklikler ï¿½ncesi konu aï¿½ï¿½lmasï¿½ ï¿½nerilir.
