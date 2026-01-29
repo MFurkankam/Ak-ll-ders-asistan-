@@ -1,50 +1,50 @@
-# Ak�ll� Ders Asistan�
+﻿# Akıllı Ders Asistanı
 
-Ders notlar�n� **y�kleyip**, onlar�n i�eri�ine dayal� **soru-cevap**, **�zet**, **quiz �retimi** ve **s�n�f y�netimi** sunan �ok sayfal� bir **Streamlit** uygulamas�. Notlar�n�zdan g�venilir yan�tlar �retmek i�in **RAG (Retrieval Augmented Generation)** yakla��m�n� kullan�r ve sonu�lar� analiz eden **raporlar** i�erir.
-
----
-
-## �zellikler
-
-- **Not Y�kleme ve K�t�phane** (PDF/DOCX/TXT)
-- **Notlara Dayal� Soru-Cevap (RAG + LLM)**
-- **�zetleme** (k�sa / orta / detayl� / �ok detayl�)
-- **Quiz �retimi** (�oktan Se�meli, Do�ru-Yanl��, Bo�luk Doldurma, K�sa Cevap)
-- **S�n�f Y�netimi** (olu�turma, kat�lma, g�ncelleme, silme)
-- **Quiz Yay�nlama ve Deneme Limitleri**
-- **Raporlar** (konu ba�ar�s�, ��renci segmenti, zaman trendi)
+Ders notlarını **yükleyip**, içeriklerine dayalı **soru-cevap**, **özet**, **quiz üretimi** ve **sınıf yönetimi** sunan çok sayfalı bir **Streamlit** uygulaması. Notlardan güvenilir yanıtlar üretmek için **RAG (Retrieval Augmented Generation)** yaklaşımını kullanır ve sonuçları analiz eden **raporlar** içerir.
 
 ---
 
-## Teknoloji Y���n�
+## Özellikler
 
-- **Python**, **Streamlit** (�ok sayfal� aray�z)
+- **Not Yükleme ve Kütüphane** (PDF/DOCX/TXT)
+- **Notlara Dayalı Soru-Cevap (RAG + LLM)**
+- **Özetleme** (kısa / orta / detaylı / çok detaylı)
+- **Quiz Üretimi** (Çoktan Seçmeli, Doğru-Yanlış, Boşluk Doldurma, Kısa Cevap)
+- **Sınıf Yönetimi** (oluşturma, katılma, güncelleme, silme)
+- **Quiz Yayınlama ve Deneme Limitleri**
+- **Raporlar** (konu başarısı, öğrenci segmenti, zaman trendi)
+
+---
+
+## Teknoloji Yığını
+
+- **Python**, **Streamlit** (çok sayfalı arayüz)
 - **Groq API + LangChain** (LLM entegrasyonu)
-- **ChromaDB** (vekt�r veritaban� / RAG)
-- **PostgreSQL + SQLModel/SQLAlchemy** (kal�c� veri)
+- **ChromaDB** (vektör veritabanı / RAG)
+- **PostgreSQL + SQLModel/SQLAlchemy** (kalıcı veri)
 - **Alembic** (migrasyon)
 - **Pandas + Altair** (raporlar ve grafikler)
 - **pytest** (testler)
 
 ---
 
-## H�zl� Ba�lang�� (Local)
+## Hızlı Başlangıç (Local)
 
-### 1) Ba��ml�l�klar
+### 1) Bağımlılıklar
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### 2) Postgres (Docker ile �nerilir)
+### 2) Postgres (Docker ile önerilir)
 
 ```bash
 docker compose up -d db
 ```
 
-> Not: Postgres varsay�lan olarak **5433** portunda �al���r.
+> Not: Postgres varsayılan olarak **5433** portunda çalışır.
 
-### 3) Ortam De�i�kenleri
+### 3) Ortam Değişkenleri
 
 **Windows (PowerShell):**
 ```powershell
@@ -58,19 +58,19 @@ export GROQ_API_KEY="YOUR_GROQ_KEY"
 export DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
 ```
 
-### 4) Migrasyonlar� �al��t�r
+### 4) Migrasyonları Çalıştır
 
 ```bash
 python -m alembic upgrade head
 ```
 
-### 5) Uygulamay� Ba�lat
+### 5) Uygulamayı Başlat
 
 ```bash
 python -m streamlit run app.py --server.port 5000 --server.address 0.0.0.0
 ```
 
-Taray�c�dan: **http://localhost:5000**
+Tarayıcıdan: **http://localhost:5000**
 
 ---
 
@@ -82,20 +82,20 @@ docker compose up --build
 
 ---
 
-## Ortam De�i�kenleri
+## Ortam Değişkenleri
 
-| De�i�ken | A��klama | �rnek |
+| Değişken | Açıklama | Örnek |
 |---|---|---|
-| `GROQ_API_KEY` | Groq API anahtar� | `gsk_...` |
-| `DATABASE_URL` | PostgreSQL ba�lant� URL�i | `postgresql+psycopg2://...` |
-| `RAG_CHUNK_SIZE` | RAG par�a boyutu | `1000` |
-| `RAG_CHUNK_OVERLAP` | RAG par�a overlap | `200` |
+| `GROQ_API_KEY` | Groq API anahtarı | `gsk_...` |
+| `DATABASE_URL` | PostgreSQL bağlantı URL’i | `postgresql+psycopg2://...` |
+| `RAG_CHUNK_SIZE` | RAG parça boyutu | `1000` |
+| `RAG_CHUNK_OVERLAP` | RAG parça overlap | `200` |
 
 ---
 
 ## Testler
 
-### SQLite ile (�nerilir, h�zl� ve izole)
+### SQLite ile (önerilir, hızlı ve izole)
 ```bash
 $env:DATABASE_URL="sqlite:///./test.db"
 python scripts\run_tests_direct.py
@@ -107,20 +107,20 @@ $env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akill
 python scripts\run_tests_direct.py
 ```
 
-> Not: PostgreSQL �zerinde testler kal�c� veri b�rak�r. Ayn� testleri tekrar �al��t�r�rken s�n�f kodu �ak��mas� olabilir. SQLite bu y�zden tavsiye edilir.
+> Not: PostgreSQL üzerinde testler kalıcı veri bırakır. Aynı testleri tekrar çalıştırırken sınıf kodu çakışması olabilir. SQLite bu yüzden tavsiye edilir.
 
 ---
 
-## Raporlar i�in Seed (Sahte Veri)
+## Raporlar için Seed (Sahte Veri)
 
-Var olan s�n�fa raporlar� test etmek i�in sahte veri ekleyebilirsiniz:
+Var olan sınıfa raporları test etmek için sahte veri ekleyebilirsiniz:
 
 ```bash
 $env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
 python scripts\seed_reports.py --class-code 1RMMI1 --students 12 --quizzes 3 --topics 5 --questions 6
 ```
 
-Temizlemek i�in:
+Temizlemek için:
 
 ```bash
 python scripts\seed_reports_cleanup.py --class-code 1RMMI1
@@ -128,47 +128,64 @@ python scripts\seed_reports_cleanup.py --class-code 1RMMI1
 
 ---
 
-## Proje Yap�s�
+## Proje Yapısı
 
 ```
 .
-+� app.py
-+� pages/
--  +� 1_Dosya_Yukle.py
--  +� 2_Soru_Cevap.py
--  +� 3_Ozet.py
--  +� 4_Quiz.py
--  +� 5_Siniflar.py
--  L� ...
-+� utils/
--  +� groq_client.py
--  +� rag_processor.py
--  +� quiz.py
--  +� db.py
--  +� models.py
--  L� ...
-+� scripts/
--  +� run_tests_direct.py
--  +� seed_reports.py
--  L� seed_reports_cleanup.py
-+� tests/
-L� alembic/
+├─ app.py
+├─ pages/
+│  ├─ 1_Dosya_Yukle.py
+│  ├─ 2_Soru_Cevap.py
+│  ├─ 3_Ozet.py
+│  ├─ 4_Quiz.py
+│  ├─ 5_Siniflar.py
+│  └─ ...
+├─ utils/
+│  ├─ groq_client.py
+│  ├─ rag_processor.py
+│  ├─ quiz.py
+│  ├─ db.py
+│  ├─ models.py
+│  └─ ...
+├─ scripts/
+│  ├─ run_tests_direct.py
+│  ├─ seed_reports.py
+│  └─ seed_reports_cleanup.py
+├─ tests/
+└─ alembic/
 ```
 
 ---
 
-## G�venlik Notlar�
+## Sık Karşılaşılan Sorunlar
 
-- Y�klenen notlar kullan�c� verisidir; eri�im ve saklama politikas� �nemlidir.
+**1) “streamlit komutu bulunamadı”**
+- `python -m streamlit ...` şeklinde çalıştırın.
+
+**2) Postgres 5432’ye bağlanıyor**
+- `DATABASE_URL`’i **5433** portu ile ayarlayın.
+
+**3) Groq API key hatası**
+- `GROQ_API_KEY` ortam değişkenini kontrol edin.
+
+**4) Raporlarda ısı haritası hatası**
+- `matplotlib` yüklü olmalı: `python -m pip install matplotlib`
+
+---
+
+## Güvenlik Notları
+
+- API anahtarlarını **kod içine yazmayın**, env var kullanın.
+- Yüklenen notlar kullanıcı verisidir; erişim ve saklama politikası önemlidir.
 
 ---
 
 ## Lisans
 
-�u an lisans belirtilmemi�tir. (�sterseniz MIT / Apache-2.0 vb. ekleyebiliriz.)
+Şu an lisans belirtilmemiştir. (İsterseniz MIT / Apache-2.0 vb. ekleyebiliriz.)
 
 ---
 
-## Katk�
+## Katkı
 
-PR ve Issue�lar memnuniyetle kabul edilir. B�y�k de�i�iklikler �ncesi konu a��lmas� �nerilir.
+PR ve Issue’lar memnuniyetle kabul edilir. Büyük değişiklikler öncesi konu açılması önerilir.
