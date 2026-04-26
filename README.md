@@ -49,13 +49,13 @@ docker compose up -d db
 **Windows (PowerShell):**
 ```powershell
 $env:GROQ_API_KEY="YOUR_GROQ_KEY"
-$env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
+$env:DATABASE_URL="URL"
 ```
 
 **macOS / Linux:**
 ```bash
 export GROQ_API_KEY="YOUR_GROQ_KEY"
-export DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
+export DATABASE_URL="URL"
 ```
 
 ### 4) Migrasyonları Çalıştır
@@ -103,7 +103,7 @@ python scripts\run_tests_direct.py
 
 ### PostgreSQL ile
 ```bash
-$env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
+$env:DATABASE_URL="URL"
 python scripts\run_tests_direct.py
 ```
 
@@ -116,7 +116,7 @@ python scripts\run_tests_direct.py
 Var olan sınıfa raporları test etmek için sahte veri ekleyebilirsiniz:
 
 ```bash
-$env:DATABASE_URL="postgresql+psycopg2://akilli:akilli_pass@localhost:5433/akilli_db"
+$env:DATABASE_URL=""
 python scripts\seed_reports.py --class-code 1RMMI1 --students 12 --quizzes 3 --topics 5 --questions 6
 ```
 
@@ -162,27 +162,11 @@ python scripts\seed_reports_cleanup.py --class-code 1RMMI1
 **1) “streamlit komutu bulunamadı”**
 - `python -m streamlit ...` şeklinde çalıştırın.
 
-**2) Postgres 5432’ye bağlanıyor**
-- `DATABASE_URL`’i **5433** portu ile ayarlayın.
-
-**3) Groq API key hatası**
+**2) Groq API key hatası**
 - `GROQ_API_KEY` ortam değişkenini kontrol edin.
 
-**4) Raporlarda ısı haritası hatası**
+**3) Raporlarda ısı haritası hatası**
 - `matplotlib` yüklü olmalı: `python -m pip install matplotlib`
-
----
-
-## Güvenlik Notları
-
-- API anahtarlarını **kod içine yazmayın**, env var kullanın.
-- Yüklenen notlar kullanıcı verisidir; erişim ve saklama politikası önemlidir.
-
----
-
-## Lisans
-
-Şu an lisans belirtilmemiştir. (İsterseniz MIT / Apache-2.0 vb. ekleyebiliriz.)
 
 ---
 
